@@ -42,8 +42,8 @@ git clone https://github.com/bulletdev/bullet-vpn.git
 cd bullet-vpn
 
 # Execute o instalador
-chmod +x install-linux.sh
-./install-linux.sh
+chmod +x install-linux.bat
+./install-linux.bat
 ```
 
 ## 🔧 Build Manual
