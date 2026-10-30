@@ -1316,8 +1316,8 @@ function App() {
                   </div>
                   <Toggle
                     icon={<Scissors className="w-3.5 h-3.5" />}
-                    label="Split Tunneling"
-                    sublabel="Exclui processos do tunnel VPN"
+                    label={t("splitTunneling")}
+                    sublabel={t("splitTunnelSub")}
                     active={splitTunOn}
                     onClick={toggleSplitTunnel}
                   />
@@ -1329,14 +1329,14 @@ function App() {
                           value={splitPidInput}
                           onChange={(e) => setSplitPidInput(e.target.value)}
                           onKeyDown={(e) => e.key === "Enter" && addSplitPid()}
-                          placeholder="PID do processo"
+                          placeholder={t("pidPlaceholder")}
                           className="flex-1 bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-xs text-neutral-300 font-mono focus:outline-none focus:ring-1 focus:ring-bullet-500"
                         />
                         <button
                           onClick={addSplitPid}
                           className="px-2 py-1 bg-bullet-600 text-white text-xs rounded hover:bg-bullet-700 transition-colors"
                         >
-                          Excluir
+                          {t("exclude")}
                         </button>
                       </div>
                       {splitPids.length > 0 && (
@@ -1363,8 +1363,8 @@ function App() {
                   )}
                   <Toggle
                     icon={connGuardOn ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
-                    label="Connection Guard"
-                    sublabel="Reconecta automaticamente ao perder conexao"
+                    label={t("connGuard")}
+                    sublabel={t("connGuardSub")}
                     active={connGuardOn}
                     onClick={toggleConnectionGuard}
                   />
