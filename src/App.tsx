@@ -337,7 +337,7 @@ function App() {
   // ── Theme ───────────────────────────────────────────────────────
 
   useEffect(() => {
-    document.documentElement.classList.toggle("light", theme === "light");
+    document.documentElement.setAttribute("data-theme", theme);
     try { localStorage.setItem("bullet-theme", theme); } catch {}
   }, [theme]);
 
