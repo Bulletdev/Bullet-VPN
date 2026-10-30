@@ -1,0 +1,50 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicedouble/tauri-apps/v2/tauri/tooling/cli/schema.json",
+  "productName": "Bullet VPN",
+  "version": "2.1.0",
+  "identifier": "com.bulletvpn.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "title": "Bullet VPN",
+        "width": 380,
+        "height": 640,
+        "resizable": true,
+        "minWidth": 320,
+        "minHeight": 500,
+        "decorations": true,
+        "transparent": false
+      }
+    ],
+    "trayIcon": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true
+    },
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    }
+  }
+}

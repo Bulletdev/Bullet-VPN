@@ -1,195 +1,434 @@
-# 🔒 Bullet VPN 
+```
+██████╗ ██╗   ██╗██╗     ██╗     ███████╗████████╗
+██╔══██╗██║   ██║██║     ██║     ██╔════╝╚══██╔══╝
+██████╔╝██║   ██║██║     ██║     █████╗     ██║
+██╔══██╗██║   ██║██║     ██║     ██╔══╝     ██║
+██████╔╝╚██████╔╝███████╗███████╗███████╗   ██║
+╚═════╝  ╚═════╝ ╚══════╝╚══════╝╚══════╝   ╚═╝
+         ██╗   ██╗██████╗ ███╗   ██╗
+         ██║   ██║██╔══██╗████╗  ██║
+         ██║   ██║██████╔╝██╔██╗ ██║
+         ╚██╗ ██╔╝██╔═══╝ ██║╚██╗██║
+          ╚████╔╝ ██║     ██║ ╚████║
+           ╚═══╝  ╚═╝     ╚═╝  ╚═══╝
+      Self-hosted VPN Client — effront
+```
 
-Uma aplicação VPN simples e segura usando WireGuard e Java com BouncyCastle.
-## 📋 Características
+<div align="center">
 
-- 🔐 **Segurança**: Chaves Curve25519 com BouncyCastle
-- ⚡ **Performance**: WireGuard nativo para máxima velocidade
-- 🎯 **Simplicidade**: Interface Swing intuitiva
-- 🚀 **Zero Logs**: Nenhum dado é armazenado remotamente
-- 💻 **Multiplataforma**: Windows, Linux e macOS
-- 🛡️ **Privacidade**: Controle total sobre seus dados
+[![Rust](https://img.shields.io/badge/rust-1.98-DEA584?logo=rust)](https://www.rust-lang.org/)
+[![Tauri](https://img.shields.io/badge/tauri-2.x-FFC131?logo=tauri)](https://v2.tauri.app/)
+[![React](https://img.shields.io/badge/react-19-61DAFB?logo=react)](https://react.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+</div>
 
-## 📦 Pré-requisitos
+---
 
-### Windows
-- Java 17+ (OpenJDK recomendado)
-- WireGuard for Windows
-- Maven 3.6+
+```
++===========================================================================+
+|  BULLET VPN -- Self-hosted WireGuard + OpenVPN Client                     |
++===========================================================================+
+|  Desktop VPN client for your own infrastructure.                          |
+|  WireGuard and OpenVPN profiles, SSH tunnel manager, kill switch,         |
+|  DNS protection. Built with Tauri 2 (Rust + React). Zero logs.           |
++===========================================================================+
+```
 
-### Linux
-- Java 17+ (`sudo apt install openjdk-17-jdk`)
-- WireGuard (`sudo apt install wireguard`)
-- Maven (`sudo apt install maven`)
+```
++---------------------------------------------------------------------------+
+|  Seguranca: Chaves Curve25519 nativas + iptables kill switch              |
+|  Performance: WireGuard kernel-level para maxima velocidade               |
+|  Protocolo: WireGuard + OpenVPN (dual stack completo)                     |
+|  Simplicidade: Interface limpa, 3 cliques para conectar                   |
+|  Zero Logs: Nenhum dado e armazenado ou enviado remotamente               |
+|  Privacidade: DNS protection via DNAT, kill switch via iptables           |
+|  Multiplataforma: Linux (pronto), Windows e macOS (planejado)             |
+|  SSH Tunnels: Port forwarding local/remote/SOCKS integrado                |
++---------------------------------------------------------------------------+
+```
 
-## 🚀 Instalação Rápida
+---
 
-### Windows
+<details>
+<summary><kbd>Features (click to expand)</kbd></summary>
+
+```
++---------------------------------------------------------------------------+
+|  CORE                                                                     |
+|  [x] Profiles        -- multiple VPN connections, switch in one click     |
+|  [x] WireGuard       -- wg-quick up/down, kernel-level tunnel            |
+|  [x] OpenVPN         -- .ovpn import, daemon management via PID          |
+|  [x] Status          -- real-time transfer RX/TX from /proc/net/dev      |
+|  [x] Config store    -- profiles persisted in ~/.config/bullet-vpn/       |
+|  [x] Import          -- paste .conf (WG) or .ovpn (OpenVPN) to import    |
+|  [x] Conflict detect -- auto teardown conflicting WG interfaces          |
+|  [x] Permissions     -- one-time sudoers install, no more password        |
+|                                                                           |
+|  SECURITY                                                                 |
+|  [x] Kill switch     -- iptables OUTPUT chain blocking non-tunnel         |
+|  [x] DNS protection  -- iptables DNAT forcing DNS through tunnel          |
+|  [x] Route control   -- granular AllowedIPs per profile                  |
+|  [ ] Split tunneling -- per-app routing via cgroup (Linux)                |
+|                                                                           |
+|  SSH TUNNELS                                                              |
+|  [x] Tunnel manager  -- local/remote/dynamic (SOCKS) port forwarding     |
+|  [x] Tunnel profiles -- save frequent tunnels (e.g. "DBeaver:15432")     |
+|  [ ] Auto-reconnect  -- persistent tunnels that survive network changes   |
+|                                                                           |
+|  AUTO-PROVISIONING                                                        |
+|  [ ] SSH register    -- auto-register peer on remote server via SSH       |
+|  [ ] Server profiles -- associate SSH credentials to VPN profiles         |
+|  [ ] Firewall check  -- test UDP reachability before connecting           |
++---------------------------------------------------------------------------+
+```
+
+</details>
+
+---
+
+## Table of Contents
+
+```
++------------------------------------------------------+
+|  01 - Quick Start                                    |
+|  02 - Technology Stack                               |
+|  03 - Architecture                                   |
+|  04 - Usage                                          |
+|  05 - Security                                       |
+|  06 - Server Setup                                   |
+|  07 - Development                                    |
+|  08 - Roadmap                                        |
+|  09 - Ethical Use                                    |
++------------------------------------------------------+
+```
+
+---
+
+## 01 - Quick Start
+
+### Prerequisites
+
+```
++---------------------------------------------------------------------------+
+|  Linux    |  sudo apt install wireguard openvpn libwebkit2gtk-4.1-dev     |
+|  Windows  |  WireGuard + OpenVPN + WebView2 Runtime                       |
+|  macOS    |  brew install wireguard-tools openvpn                         |
++---------------------------------------------------------------------------+
+```
+
+### Run from source
+
 ```bash
-# Clone o projeto
 git clone https://github.com/bulletdev/bullet-vpn.git
 cd bullet-vpn
-
-# Execute o instalador
-install-windows.bat
+npm install
+npx tauri dev
 ```
 
-### Linux
+### Build release
+
 ```bash
-# Clone o projeto
-git clone https://github.com/bulletdev/bullet-vpn.git
-cd bullet-vpn
-
-# Execute o instalador
-chmod +x install-linux.bat
-./install-linux.bat
+npx tauri build
+# Output: src-tauri/target/release/bundle/
+#   Linux  -> .deb, .AppImage
+#   Windows -> .exe, .msi
+#   macOS  -> .dmg, .app
 ```
 
-## 🔧 Build Manual
+---
 
-### 1. Compilar o projeto
+## 02 - Technology Stack
+
+```
++======================+====================================================+
+|  LAYER               |  TECHNOLOGY                                        |
++======================+====================================================+
+|  Desktop             |  Tauri 2 (Rust backend + system WebView)           |
+|  Frontend            |  React 19 + TypeScript + Tailwind CSS              |
+|  VPN Tunnel          |  WireGuard (wg-quick) + OpenVPN (daemon)           |
+|  Privilege           |  sudoers (NOPASSWD) / pkexec fallback              |
+|  Firewall            |  iptables (kill switch + DNS DNAT)                 |
+|  SSH Tunnels         |  ssh -L/-R/-D (background, PID tracked)            |
+|  Persistence         |  JSON profiles in ~/.config/bullet-vpn/            |
+|  Icons               |  Custom SVG (effront shield)                       |
+|  Build               |  Vite 6 + Tauri bundler                            |
++======================+====================================================+
+```
+
+```
++======================+=============+==============+
+|  METRIC              |  TAURI 2    |  ELECTRON    |
++======================+=============+==============+
+|  Binary size         |  ~5 MB      |  ~150 MB     |
+|  Memory usage        |  ~30 MB     |  ~150 MB+    |
+|  Backend language    |  Rust       |  Node.js     |
+|  Attack surface      |  Minimal    |  Full V8+Node|
+|  Startup time        |  < 1s       |  2-3s        |
++======================+=============+==============+
+```
+
+---
+
+## 03 - Architecture
+
+```
++-------------------------------------------+
+|              Tauri Window                 |
+|  +-------------------------------------+  |
+|  |    React Frontend (WebView)         |  |
+|  |  - VPN profiles + connect UI        |  |
+|  |  - SSH tunnel manager               |  |
+|  |  - Security toggles (KS, DNS)       |  |
+|  |  - Status dashboard + logs          |  |
+|  |  - Settings (permissions, DNS)      |  |
+|  +-------------------------------------+  |
+|              |  Tauri IPC  |              |
+|  +-------------------------------------+  |
+|  |    Rust Backend (privileged)        |  |
+|  |  - wireguard.rs   (wg-quick)        |  |
+|  |  - openvpn.rs     (openvpn daemon)  |  |
+|  |  - killswitch.rs  (iptables chain)  |  |
+|  |  - dns.rs         (iptables DNAT)   |  |
+|  |  - ssh.rs         (ssh -L/-R/-D)    |  |
+|  |  - permissions.rs (sudoers mgmt)    |  |
+|  |  - profiles.rs    (JSON CRUD)       |  |
+|  +-------------------------------------+  |
++-------------------------------------------+
+         |              |             |
+    WireGuard       OpenVPN       SSH tunnel
+    interface       tun0          (port fwd)
+```
+
+### Project Structure
+
+```
+Bullet-VPN/
+  src/                      React frontend
+    App.tsx                   Main UI (3 views: VPN, SSH, Settings)
+    main.tsx                  Entry point
+    index.css                 Tailwind base
+  src-tauri/                Rust backend
+    src/
+      lib.rs                  Tauri commands + state management
+      profiles.rs             VPN profile CRUD (WG + OVPN)
+      wireguard.rs            wg-quick up/down, config writer, conflict detect
+      openvpn.rs              openvpn daemon, PID tracking, .ovpn import
+      killswitch.rs           iptables OUTPUT chain (BULLET_VPN_KS)
+      dns.rs                  iptables nat DNAT for DNS protection
+      ssh.rs                  SSH tunnel manager (local/remote/dynamic)
+      permissions.rs          sudoers install/uninstall for NOPASSWD
+      main.rs                 Entry point
+    Cargo.toml
+    tauri.conf.json
+  package.json
+  vite.config.ts
+  tailwind.config.js
+```
+
+---
+
+## 04 - Usage
+
+### Add a WireGuard profile
+
+1. Open Bullet VPN
+2. Click `+` (manual) or the import icon (paste .conf)
+3. Fill in: name, endpoint, server public key, private key, allowed IPs
+4. Click "Conectar"
+
+### Add an OpenVPN profile
+
+1. Click the import icon
+2. Paste your .ovpn file content
+3. Auto-detected as OpenVPN (looks for `client` + `dev tun` / `<ca>`)
+4. Profile saved with endpoint extracted from `remote` directive
+
+### Kill Switch
+
+When connected, toggle "Kill Switch" in the security panel.
+Blocks all outgoing traffic except through the VPN tunnel.
+Auto-disabled on explicit disconnect.
+
+```
+iptables chain: BULLET_VPN_KS
+  ACCEPT: loopback, VPN interface, VPN endpoint, LAN (RFC1918), DHCP
+  REJECT: everything else (icmp-net-unreachable)
+```
+
+### DNS Protection
+
+Toggle "DNS Protection" to force all DNS queries through a specified server.
+Uses iptables DNAT to redirect port 53 traffic transparently.
+
+```
+iptables -t nat: DNAT all :53 -> <tunnel-dns>:53
+```
+
+### SSH Tunnels
+
+Switch to the SSH tab. Add tunnel profiles:
+
 ```bash
-mvn clean compile
+# What Bullet VPN automates:
+# Local:   ssh -L 15432:127.0.0.1:5432 -N user@host
+# Remote:  ssh -R 8080:127.0.0.1:3000 -N user@host
+# Dynamic: ssh -D 1080 -N user@host (SOCKS proxy)
 ```
 
-### 2. Criar JAR executável
+### Permissions (no more password prompts)
+
+Go to Settings, click "Instalar". One-time password prompt to write:
+
+```
+/etc/sudoers.d/bullet-vpn
+  <user> ALL=(root) NOPASSWD: wg-quick, openvpn, ip, kill, killall, iptables
+```
+
+After install, all VPN operations run via `sudo` without prompts.
+
+---
+
+## 05 - Security
+
+```
++---------------------------------------------------------------------------+
+|  SECURITY MODEL                                                           |
++---------------------------------------------------------------------------+
+|  Chaves: Curve25519 (WireGuard nativo)                                   |
+|  Protocolo: WireGuard (auditado) + OpenVPN (auditado)                    |
+|  DNS: Cloudflare (1.1.1.1), Quad9, Google, OpenDNS (configuravel)        |
+|  Kill Switch: iptables OUTPUT chain (REJECT, nao DROP)                    |
+|  DNS Protection: iptables nat DNAT (transparente, sem tocar resolv.conf)  |
+|  Logs: Apenas locais (~/.config/bullet-vpn/), nada enviado a servidores   |
+|  Configs: Permissoes 0600 em .conf e .ovpn                               |
+|  Conflitos: Auto-detect e teardown de interfaces WG conflitantes          |
+|  Privilege: sudoers NOPASSWD para comandos especificos, nao ALL           |
++---------------------------------------------------------------------------+
+```
+
+---
+
+## 06 - Server Setup
+
+### WireGuard server (Linux)
+
 ```bash
-mvn package
-```
+sudo apt install wireguard
 
-### 3. Gerar executável nativo
+wg genkey | tee /etc/wireguard/server.key | wg pubkey > /etc/wireguard/server.pub
 
-#### Windows (.exe)
-```bash
-# Usando jpackage (Java 17+)
-jpackage --input target/ --name BulletVPN --main-jar bullet-vpn-1.0.jar --main-class BulletVPN --type exe --icon src/main/resources/bullet-vpn.ico
-
-# Ou usando launch4j
-mvn launch4j:launch4j
-```
-
-#### Linux (AppImage/DEB)
-```bash
-# AppImage
-jpackage --input target/ --name BulletVPN --main-jar bullet-vpn-1.0.jar --main-class BulletVPN --type app-image
-
-# Pacote DEB
-jpackage --input target/ --name BulletVPN --main-jar bullet-vpn-1.0.jar --main-class BulletVPN --type deb
-```
-
-## 🎮 Como Usar
-
-1. **Primeira Execução**
-    - Execute `BulletVPN.exe` (Windows) ou `./BulletVPN` (Linux)
-    - Clique em "🔄 Gerar Novas Chaves"
-
-2. **Configurar Servidor**
-    - Insira o endpoint do seu servidor VPN
-    - Cole a chave pública do servidor
-    - Configure IPs permitidos (padrão: todo tráfego)
-
-3. **Conectar**
-    - Clique em "🚀 Conectar VPN"
-    - Aguarde a conexão ser estabelecida
-    - Status ficará verde quando conectado
-
-4. **Desconectar**
-    - Clique em "🛑 Desconectar"
-    - VPN será desconectada safely
-
-## 🔐 Configuração do Servidor
-
-Para usar a Bullet VPN, você precisa de um servidor WireGuard. Exemplo de configuração:
-
-### Servidor (Linux)
-```bash
-# Instalar WireGuard
-sudo apt update && sudo apt install wireguard
-
-# Gerar chaves do servidor
-wg genkey | tee server_private.key | wg pubkey > server_public.key
-
-# Configurar interface
-sudo nano /etc/wireguard/wg0.conf
-```
-
-### Arquivo de configuração do servidor:
-```ini
+# /etc/wireguard/wg0.conf
 [Interface]
-PrivateKey = CHAVE_PRIVADA_SERVIDOR
-Address = 10.0.0.1/24
+PrivateKey = <server private key>
+Address = 10.8.0.1/24
 ListenPort = 51820
 PostUp = iptables -A FORWARD -i wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
 PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
 
 [Peer]
-PublicKey = SUA_CHAVE_PUBLICA_CLIENTE
-AllowedIPs = 10.0.0.2/32
-```
+PublicKey = <client public key>
+AllowedIPs = 10.8.0.2/32
 
-### Iniciar servidor:
-```bash
 sudo wg-quick up wg0
 sudo systemctl enable wg-quick@wg0
 ```
 
-## 📁 Arquivos e Diretórios
+### OpenVPN server
 
-- **Configurações**: `~/.bullet-vpn/`
-- **Chaves**: `~/.bullet-vpn/keys.txt`
-- **Config WireGuard**: `~/.bullet-vpn/bullet.conf`
-- **Logs**: Exibidos na interface
+Use your existing .ovpn config, or generate with easy-rsa:
 
-## 🔒 Segurança
-
-- **Chaves**: Geradas usando Curve25519 (BouncyCastle)
-- **Protocolo**: WireGuard (auditado e seguro)
-- **DNS**: Cloudflare (1.1.1.1) por padrão
-- **Logs**: Apenas locais, nada enviado para servidores
-
-## 🐛 Troubleshooting
-
-### Erro "WireGuard não encontrado"
-**Windows**: Instale WireGuard do site oficial
-**Linux**: `sudo apt install wireguard`
-
-### Erro de permissão
-**Windows**: Execute como Administrador
-**Linux**: Use `sudo` ou configure capabilities
-
-### Conexão falhando
-- Verifique se o endpoint está correto
-- Confirme que a chave pública do servidor está certa
-- Teste conectividade: `ping endpoint-servidor`
-
-## 🚀 Melhorias Futuras
-
-- [ ] Auto-update de servidores
-- [ ] Múltiplos perfis de conexão
-- [ ] Kill switch automático
-- [ ] Métricas de conexão
-- [ ] Tema dark/light
-- [ ] Notificações do sistema
-
-## 📝 Licença
-
-MIT License - Use como quiser, sem garantias.
-
-## 🤝 Contribuindo
-
-1. Fork o projeto
-2. Crie sua feature branch
-3. Commit suas mudanças
-4. Push para a branch
-5. Abra um Pull Request
-
-## 📞 Suporte
-
-Para suporte ou dúvidas:
-- Abra uma issue no GitHub
-- Documentação: Wiki do projeto
+```bash
+sudo apt install openvpn easy-rsa
+# Follow standard OpenVPN server setup
+# Export client .ovpn and paste into Bullet VPN import
+```
 
 ---
 
-**⚠️ Aviso**: Esta é uma ferramenta para uso pessoal. Use responsavelmente e respeite as leis locais sobre VPNs.
+## 07 - Development
+
+### Dev mode (hot reload)
+
+```bash
+npm install
+npx tauri dev
+```
+
+### Build
+
+```bash
+npx tauri build          # release
+npx tauri build --debug  # debug symbols
+```
+
+### Rust backend only
+
+```bash
+cd src-tauri
+cargo check              # type check
+cargo clippy             # lint
+cargo test               # unit tests
+```
+
+### Frontend only
+
+```bash
+npm run dev              # Vite dev server at :1420
+npm run build            # production build to dist/
+```
+
+---
+
+## 08 - Roadmap
+
+```
++=======+==========================================+==========+
+| PHASE |  SCOPE                                   |  STATUS  |
++=======+==========================================+==========+
+|   1   |  MVP: profiles, WG connect, status       |  DONE    |
+|   2   |  OpenVPN, .ovpn import, dual protocol    |  DONE    |
+|   3   |  Kill switch, DNS protection             |  DONE    |
+|   4   |  SSH tunnel manager                      |  DONE    |
+|   5   |  Permissions (sudoers), settings panel    |  DONE    |
+|   6   |  Split tunneling (cgroup routing)         |  --      |
+|   7   |  Auto-provisioning via SSH               |  --      |
+|   8   |  Auto-reconnect, persistent tunnels       |  --      |
+|   9   |  Polish, packaging, Windows/macOS         |  --      |
++=======+==========================================+==========+
+```
+
+---
+
+## 09 - Ethical Use
+
+```
++---------------------------------------------------------------------------+
+|  Bullet VPN is a tool for managing your own VPN infrastructure.           |
+|  It does NOT provide anonymity services or relay traffic through           |
+|  third-party servers. You are responsible for your own server and          |
+|  compliance with local laws regarding VPN usage.                          |
+|                                                                           |
+|  Intended use cases:                                                      |
+|  - Accessing your own private infrastructure (VPS, homelab)               |
+|  - Authorized security testing with proper scope                          |
+|  - Corporate remote access to internal services                           |
+|  - Privacy on untrusted networks                                          |
++---------------------------------------------------------------------------+
+```
+
+---
+
+## License
+
+MIT License -- see [LICENSE](LICENSE) for details.
+
+---
+
+<div align="center">
+
+```
+Built by effront
+```
+
+</div>
