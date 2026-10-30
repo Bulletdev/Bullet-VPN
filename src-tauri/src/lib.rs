@@ -1,9 +1,12 @@
+mod connection_guard;
 mod db;
 mod dns;
 mod killswitch;
 mod openvpn;
 mod permissions;
 mod profiles;
+mod provisioning;
+mod split_tunnel;
 mod ssh;
 mod wireguard;
 
@@ -101,6 +104,37 @@ fn derive_public_key(private_key: String) -> Result<String, String> {
     Ok(encoder.encode(public.as_bytes()))
 }
 
+// ── Provisioning commands ───────────────────────────────────────────
+
+#[tauri::command]
+fn list_ssh_keys() -> Vec<String> {
+    provisioning::list_ssh_keys()
+}
+
+#[tauri::command]
+fn register_peer(
+    ssh_host: String,
+    ssh_user: String,
+    ssh_key: String,
+    server_iface: String,
+    client_pubkey: String,
+    client_allowed_ips: String,
+) -> Result<String, String> {
+    provisioning::register_peer(
+        &ssh_host,
+        &ssh_user,
+        &ssh_key,
+        &server_iface,
+        &client_pubkey,
+        &client_allowed_ips,
+    )
+}
+
+#[tauri::command]
+fn check_connectivity(host: String, port: u16) -> Result<String, String> {
+    provisioning::check_server_connectivity(&host, port)
+}
+
 // ── VPN commands ────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -117,6 +151,10 @@ fn connect(state: State<AppState>, profile_id: String) -> Result<(), String> {
             let iface_name = format!("bvpn-{}", &profile.id[..8]);
             let config_path = wireguard::write_config(&iface_name, &profile)?;
             wireguard::up(&config_path)?;
+            connection_guard::start(
+                iface_name.clone(),
+                config_path.to_string_lossy().to_string(),
+            );
             let mut active = state.active_interface.lock().map_err(|e| e.to_string())?;
             *active = Some(iface_name);
         }
@@ -131,12 +169,18 @@ fn connect(state: State<AppState>, profile_id: String) -> Result<(), String> {
 
 #[tauri::command]
 fn disconnect(state: State<AppState>) -> Result<(), String> {
+    connection_guard::stop();
+
     if killswitch::is_active() {
         let _ = killswitch::disable();
     }
     if dns::is_active() {
         let _ = dns::restore();
     }
+    if split_tunnel::is_active() {
+        let _ = split_tunnel::teardown();
+    }
+    connection_guard::stop();
 
     let wg_iface = {
         let mut active = state.active_interface.lock().map_err(|e| e.to_string())?;
@@ -265,6 +309,59 @@ fn check_dns_leak() -> Result<Vec<String>, String> {
     dns::check_leak()
 }
 
+// ── Split tunnel commands ──────────────────────────────────────────
+
+#[tauri::command]
+fn setup_split_tunnel(iface: String) -> Result<(), String> {
+    split_tunnel::setup(&iface)
+}
+
+#[tauri::command]
+fn teardown_split_tunnel() -> Result<(), String> {
+    split_tunnel::teardown()
+}
+
+#[tauri::command]
+fn split_tunnel_add_pid(pid: u32) -> Result<(), String> {
+    split_tunnel::add_pid(pid)
+}
+
+#[tauri::command]
+fn split_tunnel_remove_pid(pid: u32) -> Result<(), String> {
+    split_tunnel::remove_pid(pid)
+}
+
+#[tauri::command]
+fn split_tunnel_list_pids() -> Vec<u32> {
+    split_tunnel::list_pids()
+}
+
+// ── Connection guard commands ──────────────────────────────────────
+
+#[tauri::command]
+fn enable_connection_guard(iface: String) -> Result<(), String> {
+    let config_path = dirs::config_dir()
+        .unwrap_or_default()
+        .join("bullet-vpn")
+        .join("interfaces")
+        .join(format!("{}.conf", iface));
+    if !config_path.exists() {
+        return Err(format!("Config not found for interface {}", iface));
+    }
+    connection_guard::start(iface, config_path.to_string_lossy().to_string());
+    Ok(())
+}
+
+#[tauri::command]
+fn disable_connection_guard() {
+    connection_guard::stop();
+}
+
+#[tauri::command]
+fn connection_guard_status() -> bool {
+    connection_guard::is_active()
+}
+
 // ── OpenVPN log command ─────────────────────────────────────────────
 
 #[tauri::command]
@@ -362,6 +459,10 @@ pub fn run() {
     if dns::is_active() {
         let _ = dns::restore();
     }
+    if split_tunnel::is_active() {
+        let _ = split_tunnel::teardown();
+    }
+    connection_guard::stop();
 
     let database = Arc::new(db::Database::open().expect("failed to open database"));
     let store = ProfileStore::new(database.clone());
@@ -445,6 +546,17 @@ pub fn run() {
             stop_ssh_tunnel,
             check_ssh_tunnel,
             read_ovpn_log,
+            setup_split_tunnel,
+            teardown_split_tunnel,
+            split_tunnel_add_pid,
+            split_tunnel_remove_pid,
+            split_tunnel_list_pids,
+            list_ssh_keys,
+            register_peer,
+            check_connectivity,
+            enable_connection_guard,
+            disable_connection_guard,
+            connection_guard_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

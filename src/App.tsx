@@ -14,6 +14,11 @@ import {
   Play,
   Square,
   Key,
+  Scissors,
+  Upload,
+  ChevronRight,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -126,6 +131,19 @@ function App() {
   const [killswitchOn, setKillswitchOn] = useState(false);
   const [dnsProtOn, setDnsProtOn] = useState(false);
   const [dnsServer, setDnsServer] = useState("1.1.1.1");
+  const [splitTunOn, setSplitTunOn] = useState(false);
+  const [splitPids, setSplitPids] = useState<number[]>([]);
+  const [splitPidInput, setSplitPidInput] = useState("");
+  const [connGuardOn, setConnGuardOn] = useState(false);
+
+  // Provisioning state
+  const [showProvisioning, setShowProvisioning] = useState(false);
+  const [provSshHost, setProvSshHost] = useState("");
+  const [provSshUser, setProvSshUser] = useState("root");
+  const [provSshKey, setProvSshKey] = useState("");
+  const [provSshKeys, setProvSshKeys] = useState<string[]>([]);
+  const [provServerIface, setProvServerIface] = useState("wg0");
+  const [provStatus, setProvStatus] = useState("");
 
   // SSH state
   const [sshTunnels, setSshTunnels] = useState<SshTunnel[]>([]);
@@ -206,6 +224,7 @@ function App() {
     invoke<boolean>("check_permissions").then(setPermInstalled).catch(() => {});
     invoke<boolean>("killswitch_status").then(setKillswitchOn).catch(() => {});
     invoke<boolean>("dns_protection_status").then(setDnsProtOn).catch(() => {});
+    invoke<boolean>("connection_guard_status").then(setConnGuardOn).catch(() => {});
   }, [loadProfiles, loadSshTunnels]);
 
   useEffect(() => {
@@ -280,6 +299,9 @@ function App() {
       setWgStatus(null);
       setKillswitchOn(false);
       setDnsProtOn(false);
+      setSplitTunOn(false);
+      setSplitPids([]);
+      setConnGuardOn(false);
       addLog("Desconectado.");
     } catch (e) {
       const msg = String(e);
@@ -472,6 +494,141 @@ function App() {
         await invoke("enable_dns_protection", { dnsServer });
         setDnsProtOn(true);
         addLog(`DNS forcado para ${dnsServer}.`);
+      } catch (e) {
+        addLog(`Erro: ${e}`);
+      }
+    }
+  };
+
+  const toggleSplitTunnel = async () => {
+    if (splitTunOn) {
+      try {
+        await invoke("teardown_split_tunnel");
+        setSplitTunOn(false);
+        setSplitPids([]);
+        addLog("Split tunneling desativado.");
+      } catch (e) {
+        addLog(`Erro: ${e}`);
+      }
+    } else {
+      if (!wgStatus) {
+        addLog("Conecte a VPN antes de ativar split tunneling.");
+        return;
+      }
+      try {
+        await invoke("setup_split_tunnel", { iface: wgStatus.interface_name });
+        setSplitTunOn(true);
+        addLog("Split tunneling ativado.");
+      } catch (e) {
+        addLog(`Erro: ${e}`);
+      }
+    }
+  };
+
+  const addSplitPid = async () => {
+    const pid = parseInt(splitPidInput, 10);
+    if (!pid || pid <= 0) {
+      addLog("PID invalido.");
+      return;
+    }
+    try {
+      await invoke("split_tunnel_add_pid", { pid });
+      setSplitPidInput("");
+      const pids = await invoke<number[]>("split_tunnel_list_pids");
+      setSplitPids(pids);
+      addLog(`PID ${pid} excluido do tunnel.`);
+    } catch (e) {
+      addLog(`Erro: ${e}`);
+    }
+  };
+
+  const removeSplitPid = async (pid: number) => {
+    try {
+      await invoke("split_tunnel_remove_pid", { pid });
+      const pids = await invoke<number[]>("split_tunnel_list_pids");
+      setSplitPids(pids);
+      addLog(`PID ${pid} removido do split tunnel.`);
+    } catch (e) {
+      addLog(`Erro: ${e}`);
+    }
+  };
+
+  // ── Provisioning handlers ────────────────────────────────────────
+
+  const loadSshKeys = async () => {
+    try {
+      const keys = await invoke<string[]>("list_ssh_keys");
+      setProvSshKeys(keys);
+      if (keys.length > 0 && !provSshKey) {
+        setProvSshKey(keys[0]);
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const doRegisterPeer = async () => {
+    if (!provSshHost || !form.public_key) {
+      addLog("Gere as chaves e preencha o SSH Host antes de registrar.");
+      return;
+    }
+    setProvStatus("Registrando peer...");
+    try {
+      const result = await invoke<string>("register_peer", {
+        sshHost: provSshHost,
+        sshUser: provSshUser,
+        sshKey: provSshKey,
+        serverIface: provServerIface,
+        clientPubkey: form.public_key,
+        clientAllowedIps: form.address || "10.8.0.2/32",
+      });
+      setProvStatus(result);
+      addLog(`Provisioning: ${result}`);
+    } catch (e) {
+      const msg = String(e);
+      setProvStatus(`Erro: ${msg}`);
+      addLog(`Provisioning erro: ${msg}`);
+    }
+  };
+
+  const doCheckConnectivity = async () => {
+    if (!provSshHost) {
+      addLog("Preencha o SSH Host.");
+      return;
+    }
+    const parts = (form.endpoint || provSshHost).split(":");
+    const host = parts[0] || provSshHost;
+    const port = parseInt(parts[1] || "51820", 10);
+    setProvStatus("Testando conectividade...");
+    try {
+      const result = await invoke<string>("check_connectivity", { host, port });
+      setProvStatus(result);
+      addLog(`Conectividade: ${result}`);
+    } catch (e) {
+      const msg = String(e);
+      setProvStatus(`Erro: ${msg}`);
+      addLog(`Conectividade erro: ${msg}`);
+    }
+  };
+
+  const toggleConnectionGuard = async () => {
+    if (connGuardOn) {
+      try {
+        await invoke("disable_connection_guard");
+        setConnGuardOn(false);
+        addLog("Connection guard desativado.");
+      } catch (e) {
+        addLog(`Erro: ${e}`);
+      }
+    } else {
+      if (!wgStatus) {
+        addLog("Conecte a VPN antes de ativar o connection guard.");
+        return;
+      }
+      try {
+        await invoke("enable_connection_guard", { iface: wgStatus.interface_name });
+        setConnGuardOn(true);
+        addLog("Connection guard ativado: reconexao automatica.");
       } catch (e) {
         addLog(`Erro: ${e}`);
       }
@@ -716,6 +873,88 @@ function App() {
                     value={form.dns}
                     onChange={(v) => setForm({ ...form, dns: v })}
                   />
+                  {/* Auto-provisioning section */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowProvisioning(!showProvisioning);
+                      if (!showProvisioning) loadSshKeys();
+                    }}
+                    className="w-full flex items-center gap-2 py-1.5 px-3 bg-neutral-800/50 hover:bg-neutral-800 text-neutral-400 text-xs border border-neutral-700 rounded transition-colors"
+                  >
+                    <ChevronRight className={`w-3 h-3 transition-transform ${showProvisioning ? "rotate-90" : ""}`} />
+                    <Upload className="w-3 h-3" />
+                    Auto-provisioning (SSH)
+                  </button>
+                  {showProvisioning && (
+                    <div className="space-y-2 pl-2 border-l-2 border-neutral-800">
+                      <Field
+                        label="SSH Host *"
+                        placeholder="meu-server.com"
+                        value={provSshHost}
+                        onChange={setProvSshHost}
+                      />
+                      <Field
+                        label="SSH User"
+                        placeholder="root"
+                        value={provSshUser}
+                        onChange={setProvSshUser}
+                      />
+                      <div>
+                        <label className="block text-xs text-neutral-500 mb-0.5">SSH Key</label>
+                        {provSshKeys.length > 0 ? (
+                          <select
+                            value={provSshKey}
+                            onChange={(e) => setProvSshKey(e.target.value)}
+                            className="w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-1.5 text-sm text-neutral-200 focus:outline-none focus:ring-1 focus:ring-bullet-500"
+                          >
+                            {provSshKeys.map((k) => (
+                              <option key={k} value={k}>{k}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={provSshKey}
+                            onChange={(e) => setProvSshKey(e.target.value)}
+                            placeholder="~/.ssh/id_ed25519"
+                            className="w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-1.5 text-sm text-neutral-200 placeholder-neutral-600 focus:outline-none focus:ring-1 focus:ring-bullet-500"
+                          />
+                        )}
+                      </div>
+                      <Field
+                        label="Server Interface"
+                        placeholder="wg0"
+                        value={provServerIface}
+                        onChange={setProvServerIface}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={doRegisterPeer}
+                          disabled={!form.public_key || !provSshHost}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-bullet-600 hover:bg-bullet-700 text-white text-xs font-medium rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <Upload className="w-3 h-3" />
+                          Registrar Peer
+                        </button>
+                        <button
+                          type="button"
+                          onClick={doCheckConnectivity}
+                          disabled={!provSshHost}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-neutral-700 hover:bg-neutral-600 text-neutral-200 text-xs font-medium rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <Wifi className="w-3 h-3" />
+                          Testar Conexao
+                        </button>
+                      </div>
+                      {provStatus && (
+                        <p className={`text-[10px] px-1 ${provStatus.startsWith("Erro") ? "text-red-400" : "text-bullet-400"}`}>
+                          {provStatus}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <GreenBtn onClick={addProfile}>Salvar Perfil</GreenBtn>
               </Card>
@@ -834,7 +1073,9 @@ function App() {
             {/* Security toggles */}
             {(tunnelState === "connected" ||
               killswitchOn ||
-              dnsProtOn) && (
+              dnsProtOn ||
+              splitTunOn ||
+              connGuardOn) && (
               <Card>
                 <h2 className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-3">
                   Seguranca
@@ -867,6 +1108,60 @@ function App() {
                       />
                     )}
                   </div>
+                  <Toggle
+                    icon={<Scissors className="w-3.5 h-3.5" />}
+                    label="Split Tunneling"
+                    sublabel="Exclui processos do tunnel VPN"
+                    active={splitTunOn}
+                    onClick={toggleSplitTunnel}
+                  />
+                  {splitTunOn && (
+                    <div className="ml-6 space-y-2">
+                      <div className="flex gap-1">
+                        <input
+                          type="text"
+                          value={splitPidInput}
+                          onChange={(e) => setSplitPidInput(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && addSplitPid()}
+                          placeholder="PID do processo"
+                          className="flex-1 bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-xs text-neutral-300 font-mono focus:outline-none focus:ring-1 focus:ring-bullet-500"
+                        />
+                        <button
+                          onClick={addSplitPid}
+                          className="px-2 py-1 bg-bullet-600 text-white text-xs rounded hover:bg-bullet-700 transition-colors"
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                      {splitPids.length > 0 && (
+                        <div className="space-y-1">
+                          {splitPids.map((pid) => (
+                            <div
+                              key={pid}
+                              className="flex items-center justify-between bg-neutral-800/50 rounded px-2 py-1"
+                            >
+                              <span className="text-xs text-neutral-400 font-mono">
+                                PID {pid}
+                              </span>
+                              <button
+                                onClick={() => removeSplitPid(pid)}
+                                className="text-neutral-500 hover:text-red-400 transition-colors"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <Toggle
+                    icon={connGuardOn ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
+                    label="Connection Guard"
+                    sublabel="Reconecta automaticamente ao perder conexao"
+                    active={connGuardOn}
+                    onClick={toggleConnectionGuard}
+                  />
                 </div>
               </Card>
             )}

@@ -5,12 +5,7 @@
 ██╔══██╗██║   ██║██║     ██║     ██╔══╝     ██║
 ██████╔╝╚██████╔╝███████╗███████╗███████╗   ██║
 ╚═════╝  ╚═════╝ ╚══════╝╚══════╝╚══════╝   ╚═╝
-         ██╗   ██╗██████╗ ███╗   ██╗
-         ██║   ██║██╔══██╗████╗  ██║
-         ██║   ██║██████╔╝██╔██╗ ██║
-         ╚██╗ ██╔╝██╔═══╝ ██║╚██╗██║
-          ╚████╔╝ ██║     ██║ ╚████║
-           ╚═══╝  ╚═╝     ╚═╝  ╚═══╝
+
       Self-hosted VPN Client — effront
 ```
 
@@ -31,20 +26,20 @@
 +===========================================================================+
 |  Desktop VPN client for your own infrastructure.                          |
 |  WireGuard and OpenVPN profiles, SSH tunnel manager, kill switch,         |
-|  DNS protection. Built with Tauri 2 (Rust + React). Zero logs.           |
+|  DNS protection. Built with Tauri 2 (Rust + React). Zero logs.            |
 +===========================================================================+
 ```
 
 ```
 +---------------------------------------------------------------------------+
-|  Seguranca: Chaves Curve25519 nativas + iptables kill switch              |
-|  Performance: WireGuard kernel-level para maxima velocidade               |
-|  Protocolo: WireGuard + OpenVPN (dual stack completo)                     |
-|  Simplicidade: Interface limpa, 3 cliques para conectar                   |
+|  Seguranca: Chaves Curve25519 native  + iptables kill switch              |
+|  Performance: WireGuard kernel-level for max specified                    |
+|  Protocolo: WireGuard + OpenVPN (dual stack complete)                     |
+|  Beginner-friendly,: Clean Interface, 3 clicks to begin                   |
 |  Zero Logs: Nenhum dado e armazenado ou enviado remotamente               |
 |  Privacidade: DNS protection via DNAT, kill switch via iptables           |
-|  Multiplataforma: Linux (pronto), Windows e macOS (planejado)             |
-|  SSH Tunnels: Port forwarding local/remote/SOCKS integrado                |
+|  Multiplataforma: Linux (ready), Windows e macOS (soon)                   |
+|  SSH Tunnels: Port forwarding local/remote/SOCKS integrated               |
 +---------------------------------------------------------------------------+
 ```
 
@@ -57,23 +52,23 @@
 +---------------------------------------------------------------------------+
 |  CORE                                                                     |
 |  [x] Profiles        -- multiple VPN connections, switch in one click     |
-|  [x] WireGuard       -- wg-quick up/down, kernel-level tunnel            |
-|  [x] OpenVPN         -- .ovpn import, daemon management via PID          |
-|  [x] Status          -- real-time transfer RX/TX from /proc/net/dev      |
+|  [x] WireGuard       -- wg-quick up/down, kernel-level tunnel             |
+|  [x] OpenVPN         -- .ovpn import, daemon management via PID           |
+|  [x] Status          -- real-time transfer RX/TX from /proc/net/dev       |
 |  [x] Config store    -- profiles persisted in ~/.config/bullet-vpn/       |
-|  [x] Import          -- paste .conf (WG) or .ovpn (OpenVPN) to import    |
-|  [x] Conflict detect -- auto teardown conflicting WG interfaces          |
+|  [x] Import          -- paste .conf (WG) or .ovpn (OpenVPN) to import     |
+|  [x] Conflict detect -- auto teardown conflicting WG interfaces           |
 |  [x] Permissions     -- one-time sudoers install, no more password        |
 |                                                                           |
 |  SECURITY                                                                 |
 |  [x] Kill switch     -- iptables OUTPUT chain blocking non-tunnel         |
 |  [x] DNS protection  -- iptables DNAT forcing DNS through tunnel          |
-|  [x] Route control   -- granular AllowedIPs per profile                  |
+|  [x] Route control   -- granular AllowedIPs per profile                   |
 |  [ ] Split tunneling -- per-app routing via cgroup (Linux)                |
 |                                                                           |
 |  SSH TUNNELS                                                              |
-|  [x] Tunnel manager  -- local/remote/dynamic (SOCKS) port forwarding     |
-|  [x] Tunnel profiles -- save frequent tunnels (e.g. "DBeaver:15432")     |
+|  [x] Tunnel manager  -- local/remote/dynamic (SOCKS) port forwarding      |
+|  [x] Tunnel profiles -- save frequent tunnels (e.g. "DBeaver:15432")      |
 |  [ ] Auto-reconnect  -- persistent tunnels that survive network changes   |
 |                                                                           |
 |  AUTO-PROVISIONING                                                        |
@@ -295,13 +290,13 @@ After install, all VPN operations run via `sudo` without prompts.
 +---------------------------------------------------------------------------+
 |  SECURITY MODEL                                                           |
 +---------------------------------------------------------------------------+
-|  Chaves: Curve25519 (WireGuard nativo)                                   |
-|  Protocolo: WireGuard (auditado) + OpenVPN (auditado)                    |
-|  DNS: Cloudflare (1.1.1.1), Quad9, Google, OpenDNS (configuravel)        |
+|  Chaves: Curve25519 (WireGuard nativo)                                    |
+|  Protocolo: WireGuard (auditado) + OpenVPN (auditado)                     |
+|  DNS: Cloudflare (1.1.1.1), Quad9, Google, OpenDNS (configuravel)         |
 |  Kill Switch: iptables OUTPUT chain (REJECT, nao DROP)                    |
 |  DNS Protection: iptables nat DNAT (transparente, sem tocar resolv.conf)  |
 |  Logs: Apenas locais (~/.config/bullet-vpn/), nada enviado a servidores   |
-|  Configs: Permissoes 0600 em .conf e .ovpn                               |
+|  Configs: Permissoes 0600 em .conf e .ovpn                                |
 |  Conflitos: Auto-detect e teardown de interfaces WG conflitantes          |
 |  Privilege: sudoers NOPASSWD para comandos especificos, nao ALL           |
 +---------------------------------------------------------------------------+
@@ -390,11 +385,11 @@ npm run build            # production build to dist/
 |   2   |  OpenVPN, .ovpn import, dual protocol    |  DONE    |
 |   3   |  Kill switch, DNS protection             |  DONE    |
 |   4   |  SSH tunnel manager                      |  DONE    |
-|   5   |  Permissions (sudoers), settings panel    |  DONE    |
-|   6   |  Split tunneling (cgroup routing)         |  --      |
+|   5   |  Permissions (sudoers), settings panel   |  DONE    |
+|   6   |  Split tunneling (cgroup routing)        |  --      |
 |   7   |  Auto-provisioning via SSH               |  --      |
-|   8   |  Auto-reconnect, persistent tunnels       |  --      |
-|   9   |  Polish, packaging, Windows/macOS         |  --      |
+|   8   |  Auto-reconnect, persistent tunnels      |  --      |
+|   9   |  Polish, packaging, Windows/macOS        |  --      |
 +=======+==========================================+==========+
 ```
 
@@ -405,8 +400,8 @@ npm run build            # production build to dist/
 ```
 +---------------------------------------------------------------------------+
 |  Bullet VPN is a tool for managing your own VPN infrastructure.           |
-|  It does NOT provide anonymity services or relay traffic through           |
-|  third-party servers. You are responsible for your own server and          |
+|  It does NOT provide anonymity services or relay traffic through          |
+|  third-party servers. You are responsible for your own server and         |
 |  compliance with local laws regarding VPN usage.                          |
 |                                                                           |
 |  Intended use cases:                                                      |
