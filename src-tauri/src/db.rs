@@ -121,9 +121,7 @@ impl Database {
         if enc_b64.is_empty() {
             return Ok(String::new());
         }
-        let combined = B64
-            .decode(enc_b64)
-            .map_err(|e| format!("decode: {e}"))?;
+        let combined = B64.decode(enc_b64).map_err(|e| format!("decode: {e}"))?;
         if combined.len() < 12 {
             return Err("ciphertext too short".into());
         }
@@ -167,10 +165,10 @@ impl Database {
         .ok()
         .map(|rows| {
             rows.filter_map(|r| r.ok())
-                .filter_map(
+                .map(
                     |(id, name, vt, endpoint, spk, pk_enc, pubk, addr, aips, dns, ovpn)| {
                         let private_key = self.decrypt(&pk_enc).unwrap_or_default();
-                        Some(Profile {
+                        Profile {
                             id,
                             name,
                             vpn_type: match vt.as_str() {
@@ -185,7 +183,7 @@ impl Database {
                             allowed_ips: aips,
                             dns,
                             ovpn_config_path: ovpn,
-                        })
+                        }
                     },
                 )
                 .collect()
@@ -263,23 +261,21 @@ impl Database {
         .ok()
         .map(|rows| {
             rows.filter_map(|r| r.ok())
-                .map(
-                    |(id, name, tt, lp, rh, rp, sh, su, sk)| SshTunnel {
-                        id,
-                        name,
-                        tunnel_type: match tt.as_str() {
-                            "remote" => TunnelType::Remote,
-                            "dynamic" => TunnelType::Dynamic,
-                            _ => TunnelType::Local,
-                        },
-                        local_port: lp as u16,
-                        remote_host: rh,
-                        remote_port: rp as u16,
-                        ssh_host: sh,
-                        ssh_user: su,
-                        ssh_key: sk,
+                .map(|(id, name, tt, lp, rh, rp, sh, su, sk)| SshTunnel {
+                    id,
+                    name,
+                    tunnel_type: match tt.as_str() {
+                        "remote" => TunnelType::Remote,
+                        "dynamic" => TunnelType::Dynamic,
+                        _ => TunnelType::Local,
                     },
-                )
+                    local_port: lp as u16,
+                    remote_host: rh,
+                    remote_port: rp as u16,
+                    ssh_host: sh,
+                    ssh_user: su,
+                    ssh_key: sk,
+                })
                 .collect()
         })
         .unwrap_or_default()

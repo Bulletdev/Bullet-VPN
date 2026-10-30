@@ -24,8 +24,7 @@ pub fn import_config(profile_id: &str, ovpn_content: &str) -> Result<PathBuf, St
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o600))
-            .map_err(|e| e.to_string())?;
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).map_err(|e| e.to_string())?;
     }
 
     Ok(path)
@@ -109,7 +108,11 @@ pub fn read_log(profile_id: &str) -> String {
     match fs::read_to_string(&log) {
         Ok(content) => {
             let lines: Vec<&str> = content.lines().collect();
-            let start = if lines.len() > 20 { lines.len() - 20 } else { 0 };
+            let start = if lines.len() > 20 {
+                lines.len() - 20
+            } else {
+                0
+            };
             lines[start..].join("\n")
         }
         Err(_) => String::new(),

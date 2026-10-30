@@ -2,7 +2,7 @@ use crate::permissions;
 use crate::profiles::Profile;
 use serde::Serialize;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn config_dir() -> PathBuf {
@@ -17,7 +17,7 @@ pub fn write_config(iface_name: &str, profile: &Profile) -> Result<PathBuf, Stri
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
 
     let config = format!(
-"[Interface]
+        "[Interface]
 PrivateKey = {}
 Address = {}
 DNS = {}
@@ -42,8 +42,7 @@ PersistentKeepalive = 25
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o600))
-            .map_err(|e| e.to_string())?;
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).map_err(|e| e.to_string())?;
     }
 
     Ok(path)
@@ -93,7 +92,7 @@ pub fn teardown_conflicts() -> Result<Vec<String>, String> {
     Ok(removed)
 }
 
-pub fn up(config_path: &PathBuf) -> Result<(), String> {
+pub fn up(config_path: &Path) -> Result<(), String> {
     let output = Command::new(permissions::priv_cmd())
         .args(["wg-quick", "up", &config_path.to_string_lossy()])
         .output()

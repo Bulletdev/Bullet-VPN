@@ -81,10 +81,14 @@ pub fn start(tunnel: &SshTunnel) -> Result<u32, String> {
 
     let mut args = vec![
         "-N".to_string(),
-        "-o".to_string(), "ServerAliveInterval=30".to_string(),
-        "-o".to_string(), "ServerAliveCountMax=3".to_string(),
-        "-o".to_string(), "ExitOnForwardFailure=yes".to_string(),
-        "-o".to_string(), "StrictHostKeyChecking=accept-new".to_string(),
+        "-o".to_string(),
+        "ServerAliveInterval=30".to_string(),
+        "-o".to_string(),
+        "ServerAliveCountMax=3".to_string(),
+        "-o".to_string(),
+        "ExitOnForwardFailure=yes".to_string(),
+        "-o".to_string(),
+        "StrictHostKeyChecking=accept-new".to_string(),
         forward_arg,
     ];
 
@@ -121,9 +125,7 @@ pub fn stop(tunnel_id: &str) -> Result<(), String> {
         .trim()
         .to_string();
 
-    let _ = Command::new("kill")
-        .arg(&pid)
-        .output();
+    let _ = Command::new("kill").arg(&pid).output();
 
     fs::remove_file(&pid_file).ok();
     Ok(())

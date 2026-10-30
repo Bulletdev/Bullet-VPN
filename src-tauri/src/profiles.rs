@@ -2,17 +2,12 @@ use crate::db::Database;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum VpnType {
+    #[default]
     Wireguard,
     Openvpn,
-}
-
-impl Default for VpnType {
-    fn default() -> Self {
-        VpnType::Wireguard
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

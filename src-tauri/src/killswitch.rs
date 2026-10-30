@@ -24,18 +24,47 @@ pub fn enable(iface: &str, endpoint_ip: &str) -> Result<(), String> {
 
     run(p, &["iptables", "-A", CHAIN, "-o", "lo", "-j", "ACCEPT"])?;
     run(p, &["iptables", "-A", CHAIN, "-o", iface, "-j", "ACCEPT"])?;
-    run(p, &["iptables", "-A", CHAIN, "-d", endpoint_ip, "-j", "ACCEPT"])?;
+    run(
+        p,
+        &["iptables", "-A", CHAIN, "-d", endpoint_ip, "-j", "ACCEPT"],
+    )?;
 
     for net in &["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"] {
         run(p, &["iptables", "-A", CHAIN, "-d", net, "-j", "ACCEPT"])?;
     }
 
-    run(p, &["iptables", "-A", CHAIN, "-m", "conntrack",
-        "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT"])?;
-    run(p, &["iptables", "-A", CHAIN, "-p", "udp",
-        "--dport", "67:68", "-j", "ACCEPT"])?;
-    run(p, &["iptables", "-A", CHAIN, "-j", "REJECT",
-        "--reject-with", "icmp-net-unreachable"])?;
+    run(
+        p,
+        &[
+            "iptables",
+            "-A",
+            CHAIN,
+            "-m",
+            "conntrack",
+            "--ctstate",
+            "ESTABLISHED,RELATED",
+            "-j",
+            "ACCEPT",
+        ],
+    )?;
+    run(
+        p,
+        &[
+            "iptables", "-A", CHAIN, "-p", "udp", "--dport", "67:68", "-j", "ACCEPT",
+        ],
+    )?;
+    run(
+        p,
+        &[
+            "iptables",
+            "-A",
+            CHAIN,
+            "-j",
+            "REJECT",
+            "--reject-with",
+            "icmp-net-unreachable",
+        ],
+    )?;
 
     let _ = run(p, &["iptables", "-D", "OUTPUT", "-j", CHAIN]);
     run(p, &["iptables", "-I", "OUTPUT", "1", "-j", CHAIN])?;

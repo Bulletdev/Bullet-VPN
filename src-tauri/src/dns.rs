@@ -18,13 +18,49 @@ pub fn protect(dns_server: &str) -> Result<(), String> {
     let p = permissions::priv_cmd();
     let dst = format!("{}:53", dns_server);
 
-    run(p, &["iptables", "-t", "nat", "-A", "OUTPUT",
-        "-p", "udp", "--dport", "53", "!", "-d", dns_server,
-        "-j", "DNAT", "--to-destination", &dst])?;
+    run(
+        p,
+        &[
+            "iptables",
+            "-t",
+            "nat",
+            "-A",
+            "OUTPUT",
+            "-p",
+            "udp",
+            "--dport",
+            "53",
+            "!",
+            "-d",
+            dns_server,
+            "-j",
+            "DNAT",
+            "--to-destination",
+            &dst,
+        ],
+    )?;
 
-    run(p, &["iptables", "-t", "nat", "-A", "OUTPUT",
-        "-p", "tcp", "--dport", "53", "!", "-d", dns_server,
-        "-j", "DNAT", "--to-destination", &dst])?;
+    run(
+        p,
+        &[
+            "iptables",
+            "-t",
+            "nat",
+            "-A",
+            "OUTPUT",
+            "-p",
+            "tcp",
+            "--dport",
+            "53",
+            "!",
+            "-d",
+            dns_server,
+            "-j",
+            "DNAT",
+            "--to-destination",
+            &dst,
+        ],
+    )?;
 
     fs::write(marker_path(), dns_server).map_err(|e| e.to_string())?;
     Ok(())
@@ -39,13 +75,49 @@ pub fn restore() -> Result<(), String> {
     if !server.is_empty() {
         let dst = format!("{}:53", server);
 
-        let _ = run(p, &["iptables", "-t", "nat", "-D", "OUTPUT",
-            "-p", "udp", "--dport", "53", "!", "-d", server,
-            "-j", "DNAT", "--to-destination", &dst]);
+        let _ = run(
+            p,
+            &[
+                "iptables",
+                "-t",
+                "nat",
+                "-D",
+                "OUTPUT",
+                "-p",
+                "udp",
+                "--dport",
+                "53",
+                "!",
+                "-d",
+                server,
+                "-j",
+                "DNAT",
+                "--to-destination",
+                &dst,
+            ],
+        );
 
-        let _ = run(p, &["iptables", "-t", "nat", "-D", "OUTPUT",
-            "-p", "tcp", "--dport", "53", "!", "-d", server,
-            "-j", "DNAT", "--to-destination", &dst]);
+        let _ = run(
+            p,
+            &[
+                "iptables",
+                "-t",
+                "nat",
+                "-D",
+                "OUTPUT",
+                "-p",
+                "tcp",
+                "--dport",
+                "53",
+                "!",
+                "-d",
+                server,
+                "-j",
+                "DNAT",
+                "--to-destination",
+                &dst,
+            ],
+        );
     }
 
     fs::remove_file(marker_path()).ok();
@@ -53,8 +125,7 @@ pub fn restore() -> Result<(), String> {
 }
 
 pub fn check_leak() -> Result<Vec<String>, String> {
-    let content = fs::read_to_string("/etc/resolv.conf")
-        .map_err(|e| e.to_string())?;
+    let content = fs::read_to_string("/etc/resolv.conf").map_err(|e| e.to_string())?;
 
     let servers: Vec<String> = content
         .lines()

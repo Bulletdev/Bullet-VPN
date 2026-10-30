@@ -14,12 +14,15 @@ pub fn is_installed() -> bool {
 }
 
 pub fn priv_cmd() -> &'static str {
-    if is_installed() { "sudo" } else { "pkexec" }
+    if is_installed() {
+        "sudo"
+    } else {
+        "pkexec"
+    }
 }
 
 pub fn install() -> Result<(), String> {
-    let user = std::env::var("USER")
-        .map_err(|_| "Variavel USER nao definida".to_string())?;
+    let user = std::env::var("USER").map_err(|_| "Variavel USER nao definida".to_string())?;
 
     let wg = find_bin("wg-quick").unwrap_or("/usr/bin/wg-quick".into());
     let ovpn = find_bin("openvpn").unwrap_or("/usr/sbin/openvpn".into());
