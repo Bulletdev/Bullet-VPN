@@ -389,7 +389,7 @@ npm run build            # production build to dist/
 |   6   |  Split tunneling (cgroup routing)        |  DONE    |
 |   7   |  Auto-provisioning via SSH               |  DONE    |
 |   8   |  Auto-reconnect, connection guard        |  DONE    |
-|   9   |  Polish, packaging, Windows/macOS        |  --      |
+|   9   |  Theme, i18n, update check, packaging     |  DONE    |
 +=======+==========================================+==========+
 ```
 
