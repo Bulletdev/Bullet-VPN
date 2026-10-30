@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, createContext, useContext } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   RefreshCw,
@@ -68,35 +68,9 @@ type TunnelState =
 
 type AppView = "vpn" | "ssh" | "settings";
 
-// ── Constants ───────────────────────────────────────────────────────
-
-const EMPTY_PROFILE: Omit<Profile, "id"> = {
-  name: "",
-  vpn_type: "wireguard",
-  endpoint: "",
-  server_pubkey: "",
-  private_key: "",
-  public_key: "",
-  address: "10.8.0.2/32",
-  allowed_ips: "10.8.0.0/24",
-  dns: "1.1.1.1",
-  ovpn_config_path: "",
-};
-
-const EMPTY_SSH: Omit<SshTunnel, "id"> = {
-  name: "",
-  tunnel_type: "local",
-  local_port: 0,
-  remote_host: "127.0.0.1",
-  remote_port: 0,
-  ssh_host: "",
-  ssh_user: "root",
-  ssh_key: "~/.ssh/id_ed25519",
-};
-
-// ── i18n ───────────────────────────────────────────────────────────
-
 type Locale = "pt-BR" | "en-US";
+
+// ── Translations ────────────────────────────────────────────────────
 
 const translations: Record<Locale, Record<string, string>> = {
   "pt-BR": {
@@ -125,12 +99,15 @@ const translations: Record<Locale, Record<string, string>> = {
     import: "Importar",
     pasteConf: "Cole o conteudo do arquivo .conf (WireGuard) ou .ovpn (OpenVPN) aqui...",
     addProfilePrompt: "Adicione um perfil VPN para comecar",
+    removeProfile: "Remover perfil",
+    newProfile: "Novo perfil",
     connect: "Conectar",
     disconnect: "Desconectar",
     disconnectClearError: "Desconectar (limpar erro)",
     killSwitch: "Kill Switch",
     killSwitchSub: "Bloqueia trafego fora do tunnel",
     dnsProtection: "DNS Protection",
+    dnsForcePrefix: "Forca DNS para {server}",
     splitTunneling: "Split Tunneling",
     splitTunnelSub: "Exclui processos do tunnel VPN",
     pidPlaceholder: "PID do processo",
@@ -156,11 +133,13 @@ const translations: Record<Locale, Record<string, string>> = {
     current: "atual",
     verify: "Verificar",
     about: "Sobre",
+    language: "Idioma",
     logs: "Logs",
     clear: "Limpar",
     noLogs: "Nenhum log.",
     addSshTunnel: "Adicione um SSH tunnel",
     newSshTunnel: "Novo SSH Tunnel",
+    newTunnel: "Novo tunnel",
     tunnelType: "Tipo",
     localPort: "Porta Local *",
     remoteHost: "Remote Host",
@@ -169,11 +148,71 @@ const translations: Record<Locale, Record<string, string>> = {
     sshUser: "SSH User",
     sshKey: "SSH Key",
     saveTunnel: "Salvar Tunnel",
+    start: "Iniciar",
+    stop: "Parar",
     autoProvisioning: "Auto-provisioning (SSH)",
     serverIface: "Server Interface",
     registerPeer: "Registrar Peer",
     testConnection: "Testar Conexao",
-    language: "Idioma",
+    logLoadProfilesError: "Erro ao carregar perfis: {error}",
+    logTunnelActive: "Tunnel ativo.",
+    logTunnelDown: "Tunnel caiu.",
+    logStartingConnection: "Iniciando conexao...",
+    logTimeout: "Timeout: sem resposta em 30s.",
+    logTimeoutAuth: "Timeout aguardando autorizacao.",
+    logConnected: "Conectado!",
+    logCheckingConflicts: "Verificando interfaces conflitantes...",
+    logConflictsRemoved: "Interfaces removidas: {ifaces}",
+    logConflictsWarning: "Aviso ao limpar conflitos: {error}",
+    logDisconnecting: "Desconectando...",
+    logDisconnected: "Desconectado.",
+    logFillRequired: "Preencha nome, endpoint, server pubkey e private key.",
+    logProfileSaved: "Perfil \"{name}\" salvo.",
+    logSaveError: "Erro ao salvar: {error}",
+    logConfInvalid: "Conf invalido: falta PrivateKey, PublicKey ou Endpoint.",
+    logWgImported: "Perfil WireGuard importado: {endpoint}",
+    logOvpnImported: "Perfil OpenVPN importado: {endpoint}",
+    logImportOvpnError: "Erro ao importar OpenVPN: {error}",
+    logImportError: "Erro ao importar: {error}",
+    logProfileRemoved: "Perfil \"{name}\" removido.",
+    logRemoveError: "Erro ao remover: {error}",
+    logKillswitchOff: "Kill switch desativado.",
+    logVpnFirstKillswitch: "Conecte a VPN antes de ativar o kill switch.",
+    logKillswitchOn: "Kill switch ativado.",
+    logError: "Erro: {error}",
+    logDnsProtOff: "DNS protection desativado.",
+    logDnsForced: "DNS forcado para {server}.",
+    logSplitTunOff: "Split tunneling desativado.",
+    logVpnFirstSplit: "Conecte a VPN antes de ativar split tunneling.",
+    logSplitTunOn: "Split tunneling ativado.",
+    logPidInvalid: "PID invalido.",
+    logPidExcluded: "PID {pid} excluido do tunnel.",
+    logPidRemoved: "PID {pid} removido do split tunnel.",
+    logGenKeysFirst: "Gere as chaves e preencha o SSH Host antes de registrar.",
+    logRegisteringPeer: "Registrando peer...",
+    logProvResult: "Provisioning: {result}",
+    logProvError: "Provisioning erro: {error}",
+    logFillSshHost: "Preencha o SSH Host.",
+    logTestingConn: "Testando conectividade...",
+    logConnResult: "Conectividade: {result}",
+    logConnError: "Conectividade erro: {error}",
+    logConnGuardOff: "Connection guard desativado.",
+    logVpnFirstGuard: "Conecte a VPN antes de ativar o connection guard.",
+    logConnGuardOn: "Connection guard ativado: reconexao automatica.",
+    logFillSshRequired: "Preencha nome, SSH host e porta local.",
+    logTunnelSaved: "Tunnel \"{name}\" salvo.",
+    logTunnelRemoved: "Tunnel removido.",
+    logTunnelStarted: "Tunnel iniciado (PID {pid}).",
+    logTunnelStopped: "Tunnel parado.",
+    logInstallingPerms: "Instalando permissoes (uma senha admin necessaria)...",
+    logPermsInstalled: "Permissoes instaladas. Sem mais prompts de senha.",
+    logRemovingPerms: "Removendo permissoes...",
+    logPermsRemoved: "Permissoes removidas.",
+    logKeysGenerated: "Par de chaves X25519 gerado.",
+    logKeysError: "Erro ao gerar chaves: {error}",
+    logUpdateAvailable: "Atualizacao disponivel: v{version}",
+    logUpToDate: "Versao atual (v{version}) e a mais recente.",
+    logUpdateError: "Erro ao verificar atualizacao: {error}",
   },
   "en-US": {
     disconnected: "Disconnected",
@@ -201,12 +240,15 @@ const translations: Record<Locale, Record<string, string>> = {
     import: "Import",
     pasteConf: "Paste the .conf (WireGuard) or .ovpn (OpenVPN) file content here...",
     addProfilePrompt: "Add a VPN profile to get started",
+    removeProfile: "Remove profile",
+    newProfile: "New profile",
     connect: "Connect",
     disconnect: "Disconnect",
     disconnectClearError: "Disconnect (clear error)",
     killSwitch: "Kill Switch",
     killSwitchSub: "Blocks traffic outside the tunnel",
     dnsProtection: "DNS Protection",
+    dnsForcePrefix: "Forces DNS to {server}",
     splitTunneling: "Split Tunneling",
     splitTunnelSub: "Exclude processes from VPN tunnel",
     pidPlaceholder: "Process PID",
@@ -232,11 +274,13 @@ const translations: Record<Locale, Record<string, string>> = {
     current: "current",
     verify: "Check",
     about: "About",
+    language: "Language",
     logs: "Logs",
     clear: "Clear",
     noLogs: "No logs.",
     addSshTunnel: "Add an SSH tunnel",
     newSshTunnel: "New SSH Tunnel",
+    newTunnel: "New tunnel",
     tunnelType: "Type",
     localPort: "Local Port *",
     remoteHost: "Remote Host",
@@ -245,13 +289,104 @@ const translations: Record<Locale, Record<string, string>> = {
     sshUser: "SSH User",
     sshKey: "SSH Key",
     saveTunnel: "Save Tunnel",
+    start: "Start",
+    stop: "Stop",
     autoProvisioning: "Auto-provisioning (SSH)",
     serverIface: "Server Interface",
     registerPeer: "Register Peer",
     testConnection: "Test Connection",
-    language: "Language",
+    logLoadProfilesError: "Error loading profiles: {error}",
+    logTunnelActive: "Tunnel active.",
+    logTunnelDown: "Tunnel down.",
+    logStartingConnection: "Starting connection...",
+    logTimeout: "Timeout: no response in 30s.",
+    logTimeoutAuth: "Timeout waiting for authorization.",
+    logConnected: "Connected!",
+    logCheckingConflicts: "Checking conflicting interfaces...",
+    logConflictsRemoved: "Interfaces removed: {ifaces}",
+    logConflictsWarning: "Warning clearing conflicts: {error}",
+    logDisconnecting: "Disconnecting...",
+    logDisconnected: "Disconnected.",
+    logFillRequired: "Fill in name, endpoint, server pubkey and private key.",
+    logProfileSaved: "Profile \"{name}\" saved.",
+    logSaveError: "Error saving: {error}",
+    logConfInvalid: "Invalid conf: missing PrivateKey, PublicKey or Endpoint.",
+    logWgImported: "WireGuard profile imported: {endpoint}",
+    logOvpnImported: "OpenVPN profile imported: {endpoint}",
+    logImportOvpnError: "Error importing OpenVPN: {error}",
+    logImportError: "Error importing: {error}",
+    logProfileRemoved: "Profile \"{name}\" removed.",
+    logRemoveError: "Error removing: {error}",
+    logKillswitchOff: "Kill switch disabled.",
+    logVpnFirstKillswitch: "Connect VPN before enabling kill switch.",
+    logKillswitchOn: "Kill switch enabled.",
+    logError: "Error: {error}",
+    logDnsProtOff: "DNS protection disabled.",
+    logDnsForced: "DNS forced to {server}.",
+    logSplitTunOff: "Split tunneling disabled.",
+    logVpnFirstSplit: "Connect VPN before enabling split tunneling.",
+    logSplitTunOn: "Split tunneling enabled.",
+    logPidInvalid: "Invalid PID.",
+    logPidExcluded: "PID {pid} excluded from tunnel.",
+    logPidRemoved: "PID {pid} removed from split tunnel.",
+    logGenKeysFirst: "Generate keys and fill SSH Host before registering.",
+    logRegisteringPeer: "Registering peer...",
+    logProvResult: "Provisioning: {result}",
+    logProvError: "Provisioning error: {error}",
+    logFillSshHost: "Fill in SSH Host.",
+    logTestingConn: "Testing connectivity...",
+    logConnResult: "Connectivity: {result}",
+    logConnError: "Connectivity error: {error}",
+    logConnGuardOff: "Connection guard disabled.",
+    logVpnFirstGuard: "Connect VPN before enabling connection guard.",
+    logConnGuardOn: "Connection guard enabled: auto-reconnect.",
+    logFillSshRequired: "Fill in name, SSH host and local port.",
+    logTunnelSaved: "Tunnel \"{name}\" saved.",
+    logTunnelRemoved: "Tunnel removed.",
+    logTunnelStarted: "Tunnel started (PID {pid}).",
+    logTunnelStopped: "Tunnel stopped.",
+    logInstallingPerms: "Installing permissions (one admin password needed)...",
+    logPermsInstalled: "Permissions installed. No more password prompts.",
+    logRemovingPerms: "Removing permissions...",
+    logPermsRemoved: "Permissions removed.",
+    logKeysGenerated: "X25519 key pair generated.",
+    logKeysError: "Error generating keys: {error}",
+    logUpdateAvailable: "Update available: v{version}",
+    logUpToDate: "Current version (v{version}) is up to date.",
+    logUpdateError: "Error checking update: {error}",
   },
 };
+
+// ── Constants ───────────────────────────────────────────────────────
+
+const EMPTY_PROFILE: Omit<Profile, "id"> = {
+  name: "",
+  vpn_type: "wireguard",
+  endpoint: "",
+  server_pubkey: "",
+  private_key: "",
+  public_key: "",
+  address: "10.8.0.2/32",
+  allowed_ips: "10.8.0.0/24",
+  dns: "1.1.1.1",
+  ovpn_config_path: "",
+};
+
+const EMPTY_SSH: Omit<SshTunnel, "id"> = {
+  name: "",
+  tunnel_type: "local",
+  local_port: 0,
+  remote_host: "127.0.0.1",
+  remote_port: 0,
+  ssh_host: "",
+  ssh_user: "root",
+  ssh_key: "~/.ssh/id_ed25519",
+};
+
+// ── Theme & i18n contexts ──────────────────────────────────────────
+
+const ThemeCtx = createContext<boolean>(true);
+const I18nCtx = createContext<(key: string, vars?: Record<string, string | number>) => string>((k) => k);
 
 // ── Custom Icons ────────────────────────────────────────────────────
 
@@ -272,18 +407,39 @@ function ShieldIcon({ className }: { className?: string }) {
 
 function App() {
   const [view, setView] = useState<AppView>("vpn");
+
+  // i18n & theme
   const [locale, setLocale] = useState<Locale>(
-    () => (localStorage.getItem("bullet-locale") as Locale) || "pt-BR"
+    () => (localStorage.getItem("bullet-locale") as Locale) || "pt-BR",
+  );
+  const [theme, setTheme] = useState<"dark" | "light">(
+    () => (localStorage.getItem("bullet-theme") as "dark" | "light") || "dark",
   );
 
+  const isDark = theme === "dark";
+
   const t = useCallback(
-    (key: string) => translations[locale]?.[key] ?? translations["pt-BR"]?.[key] ?? key,
-    [locale]
+    (key: string, vars?: Record<string, string | number>) => {
+      let text = translations[locale]?.[key] ?? translations["pt-BR"]?.[key] ?? key;
+      if (vars) {
+        for (const [k, v] of Object.entries(vars)) {
+          text = text.replace(`{${k}}`, String(v));
+        }
+      }
+      return text;
+    },
+    [locale],
   );
 
   useEffect(() => {
-    try { localStorage.setItem("bullet-locale", locale); } catch {}
+    try { localStorage.setItem("bullet-locale", locale); } catch { /* ignore */ }
   }, [locale]);
+
+  useEffect(() => {
+    try { localStorage.setItem("bullet-theme", theme); } catch { /* ignore */ }
+    document.documentElement.setAttribute("data-theme", theme);
+    document.documentElement.classList.toggle("light", theme === "light");
+  }, [theme]);
 
   // VPN state
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -324,22 +480,12 @@ function App() {
 
   // Settings state
   const [permInstalled, setPermInstalled] = useState(false);
-  const [theme, setTheme] = useState<"dark" | "light">(
-    () => (localStorage.getItem("bullet-theme") as "dark" | "light") || "dark"
-  );
   const [updateInfo, setUpdateInfo] = useState<{
     current: string;
     latest: string;
     has_update: boolean;
     url: string;
   } | null>(null);
-
-  // ── Theme ───────────────────────────────────────────────────────
-
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    try { localStorage.setItem("bullet-theme", theme); } catch {}
-  }, [theme]);
 
   // ── Helpers ─────────────────────────────────────────────────────
 
@@ -358,24 +504,20 @@ function App() {
         setSelectedProfile(result[0].id);
       }
     } catch (e) {
-      addLog(`Erro ao carregar perfis: ${e}`);
+      addLog(t("logLoadProfilesError", { error: String(e) }));
     }
-  }, [selectedProfile, addLog]);
+  }, [selectedProfile, addLog, t]);
 
   const loadSshTunnels = useCallback(async () => {
     try {
       const result = await invoke<SshTunnel[]>("list_ssh_tunnels");
       setSshTunnels(result);
       const running: Record<string, boolean> = {};
-      for (const t of result) {
-        running[t.id] = await invoke<boolean>("check_ssh_tunnel", {
-          tunnelId: t.id,
-        });
+      for (const tun of result) {
+        running[tun.id] = await invoke<boolean>("check_ssh_tunnel", { tunnelId: tun.id });
       }
       setSshRunning(running);
-    } catch {
-      /* ignore */
-    }
+    } catch { /* ignore */ }
   }, []);
 
   const checkStatus = useCallback(async () => {
@@ -386,7 +528,7 @@ function App() {
         if (tunnelState === "connecting") {
           if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
           setTunnelState("connected");
-          addLog("Tunnel ativo.");
+          addLog(t("logTunnelActive"));
         } else if (tunnelState !== "disconnecting") {
           setTunnelState("connected");
         }
@@ -394,7 +536,7 @@ function App() {
         setWgStatus(null);
         if (tunnelState === "connected") {
           setTunnelState("disconnected");
-          addLog("Tunnel caiu.");
+          addLog(t("logTunnelDown"));
         }
       }
     } catch {
@@ -403,7 +545,7 @@ function App() {
         setTunnelState("disconnected");
       }
     }
-  }, [tunnelState, addLog]);
+  }, [tunnelState, addLog, t]);
 
   useEffect(() => {
     loadProfiles();
@@ -421,39 +563,37 @@ function App() {
 
   // ── VPN handlers ────────────────────────────────────────────────
 
-  const allowConnect =
-    tunnelState === "disconnected" || tunnelState === "error";
-  const allowDisconnect =
-    tunnelState === "connected" || tunnelState === "error";
+  const allowConnect = tunnelState === "disconnected" || tunnelState === "error";
+  const allowDisconnect = tunnelState === "connected" || tunnelState === "error";
 
   const doConnect = async () => {
     setTunnelState("connecting");
     setErrorMsg(null);
-    addLog("Iniciando conexao...");
+    addLog(t("logStartingConnection"));
 
     fallbackTimer.current = setTimeout(() => {
       setTunnelState((prev) => {
         if (prev === "connecting") {
-          addLog("Timeout: sem resposta em 30s.");
+          addLog(t("logTimeout"));
           return "error";
         }
         return prev;
       });
-      setErrorMsg("Timeout aguardando autorizacao.");
+      setErrorMsg(t("logTimeoutAuth"));
     }, 30000);
 
     try {
       await invoke("connect", { profileId: selectedProfile });
       if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
       setTunnelState("connected");
-      addLog("Conectado!");
+      addLog(t("logConnected"));
       await checkStatus();
     } catch (e) {
       if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
       const msg = String(e);
       setTunnelState("error");
       setErrorMsg(msg);
-      addLog(`Erro: ${msg}`);
+      addLog(t("logError", { error: msg }));
     }
   };
 
@@ -461,13 +601,13 @@ function App() {
     if (!selectedProfile || !allowConnect) return;
 
     try {
-      addLog("Verificando interfaces conflitantes...");
+      addLog(t("logCheckingConflicts"));
       const removed = await invoke<string[]>("teardown_conflicts");
       if (removed.length > 0) {
-        addLog(`Interfaces removidas: ${removed.join(", ")}`);
+        addLog(t("logConflictsRemoved", { ifaces: removed.join(", ") }));
       }
     } catch (e) {
-      addLog(`Aviso ao limpar conflitos: ${e}`);
+      addLog(t("logConflictsWarning", { error: String(e) }));
     }
 
     await doConnect();
@@ -475,10 +615,9 @@ function App() {
 
   const disconnectVpn = async () => {
     if (!allowDisconnect) return;
-
     setTunnelState("disconnecting");
     setErrorMsg(null);
-    addLog("Desconectando...");
+    addLog(t("logDisconnecting"));
 
     try {
       await invoke("disconnect");
@@ -489,21 +628,20 @@ function App() {
       setSplitTunOn(false);
       setSplitPids([]);
       setConnGuardOn(false);
-      addLog("Desconectado.");
+      addLog(t("logDisconnected"));
     } catch (e) {
       const msg = String(e);
       setTunnelState("error");
       setErrorMsg(msg);
-      addLog(`Erro: ${msg}`);
+      addLog(t("logError", { error: msg }));
     }
   };
 
   const addProfile = async () => {
     if (!form.name || !form.endpoint || !form.server_pubkey || !form.private_key) {
-      addLog("Preencha nome, endpoint, server pubkey e private key.");
+      addLog(t("logFillRequired"));
       return;
     }
-
     const id = crypto.randomUUID();
     const profile: Profile = {
       id,
@@ -515,37 +653,31 @@ function App() {
       dns: form.dns || "1.1.1.1",
       ovpn_config_path: "",
     };
-
     try {
       await invoke("add_profile", { profile });
-      addLog(`Perfil "${form.name}" salvo.`);
+      addLog(t("logProfileSaved", { name: form.name }));
       setForm(EMPTY_PROFILE);
       setShowForm(false);
       await loadProfiles();
       setSelectedProfile(id);
     } catch (e) {
-      addLog(`Erro ao salvar: ${e}`);
+      addLog(t("logSaveError", { error: String(e) }));
     }
   };
 
   const importConf = async () => {
     const text = importText.trim();
-    const isOvpn =
-      text.includes("client") &&
-      (text.includes("dev tun") || text.includes("<ca>"));
+    const isOvpn = text.includes("client") && (text.includes("dev tun") || text.includes("<ca>"));
     const id = crypto.randomUUID();
 
     if (isOvpn) {
       const remoteMatch = text.match(/remote\s+(\S+)\s+(\d+)/);
-      const endpoint = remoteMatch
-        ? `${remoteMatch[1]}:${remoteMatch[2]}`
-        : "OpenVPN";
-
+      const ep = remoteMatch ? `${remoteMatch[1]}:${remoteMatch[2]}` : "OpenVPN";
       const profile: Profile = {
         id,
-        name: `OpenVPN - ${endpoint}`,
+        name: `OpenVPN - ${ep}`,
         vpn_type: "openvpn",
-        endpoint,
+        endpoint: ep,
         server_pubkey: "",
         private_key: "",
         public_key: "",
@@ -554,17 +686,16 @@ function App() {
         dns: "",
         ovpn_config_path: "",
       };
-
       try {
         await invoke("add_profile", { profile });
         await invoke("import_ovpn", { profileId: id, content: text });
-        addLog(`Perfil OpenVPN importado: ${endpoint}`);
+        addLog(t("logOvpnImported", { endpoint: ep }));
         setImportText("");
         setShowImport(false);
         await loadProfiles();
         setSelectedProfile(id);
       } catch (e) {
-        addLog(`Erro ao importar OpenVPN: ${e}`);
+        addLog(t("logImportOvpnError", { error: String(e) }));
       }
       return;
     }
@@ -572,67 +703,62 @@ function App() {
     const lines = text.split("\n");
     const parsed: Record<string, string> = {};
     let section = "";
-
     for (const raw of lines) {
       const line = raw.trim();
-      if (line.startsWith("[")) {
-        section = line;
-        continue;
-      }
+      if (line.startsWith("[")) { section = line; continue; }
       const eq = line.indexOf("=");
       if (eq === -1) continue;
-      const key = `${section}${line.slice(0, eq).trim()}`;
-      parsed[key] = line.slice(eq + 1).trim();
+      const pKey = `${section}${line.slice(0, eq).trim()}`;
+      parsed[pKey] = line.slice(eq + 1).trim();
     }
 
     const privateKey = parsed["[Interface]PrivateKey"] || "";
-    const address = parsed["[Interface]Address"] || "10.8.0.2/32";
+    const pAddress = parsed["[Interface]Address"] || "10.8.0.2/32";
     const confDns = parsed["[Interface]DNS"] || "1.1.1.1";
     const pubkey = parsed["[Peer]PublicKey"] || "";
-    const endpoint = parsed["[Peer]Endpoint"] || "";
+    const ep = parsed["[Peer]Endpoint"] || "";
     const allowedIPs = parsed["[Peer]AllowedIPs"] || "0.0.0.0/0";
 
-    if (!privateKey || !pubkey || !endpoint) {
-      addLog("Conf invalido: falta PrivateKey, PublicKey ou Endpoint.");
+    if (!privateKey || !pubkey || !ep) {
+      addLog(t("logConfInvalid"));
       return;
     }
 
     const profile: Profile = {
       id,
-      name: `WireGuard - ${endpoint}`,
+      name: `WireGuard - ${ep}`,
       vpn_type: "wireguard",
-      endpoint,
+      endpoint: ep,
       server_pubkey: pubkey,
       private_key: privateKey,
       public_key: "",
-      address,
+      address: pAddress,
       allowed_ips: allowedIPs,
       dns: confDns,
       ovpn_config_path: "",
     };
-
     try {
       await invoke("add_profile", { profile });
-      addLog(`Perfil WireGuard importado: ${endpoint}`);
+      addLog(t("logWgImported", { endpoint: ep }));
       setImportText("");
       setShowImport(false);
       await loadProfiles();
       setSelectedProfile(id);
     } catch (e) {
-      addLog(`Erro ao importar: ${e}`);
+      addLog(t("logImportError", { error: String(e) }));
     }
   };
 
   const removeProfile = async () => {
     if (!selectedProfile) return;
-    const name = profiles.find((p) => p.id === selectedProfile)?.name;
+    const pName = profiles.find((p) => p.id === selectedProfile)?.name;
     try {
       await invoke("remove_profile", { profileId: selectedProfile });
-      addLog(`Perfil "${name}" removido.`);
+      addLog(t("logProfileRemoved", { name: pName || "" }));
       setSelectedProfile(null);
       await loadProfiles();
     } catch (e) {
-      addLog(`Erro ao remover: ${e}`);
+      addLog(t("logRemoveError", { error: String(e) }));
     }
   };
 
@@ -643,26 +769,20 @@ function App() {
       try {
         await invoke("disable_killswitch");
         setKillswitchOn(false);
-        addLog("Kill switch desativado.");
+        addLog(t("logKillswitchOff"));
       } catch (e) {
-        addLog(`Erro: ${e}`);
+        addLog(t("logError", { error: String(e) }));
       }
     } else {
-      if (!wgStatus) {
-        addLog("Conecte a VPN antes de ativar o kill switch.");
-        return;
-      }
+      if (!wgStatus) { addLog(t("logVpnFirstKillswitch")); return; }
       const prof = profiles.find((p) => p.id === selectedProfile);
       const epIp = (prof?.endpoint || "").split(":")[0];
       try {
-        await invoke("enable_killswitch", {
-          iface: wgStatus.interface_name,
-          endpointIp: epIp,
-        });
+        await invoke("enable_killswitch", { iface: wgStatus.interface_name, endpointIp: epIp });
         setKillswitchOn(true);
-        addLog("Kill switch ativado.");
+        addLog(t("logKillswitchOn"));
       } catch (e) {
-        addLog(`Erro: ${e}`);
+        addLog(t("logError", { error: String(e) }));
       }
     }
   };
@@ -672,17 +792,17 @@ function App() {
       try {
         await invoke("disable_dns_protection");
         setDnsProtOn(false);
-        addLog("DNS protection desativado.");
+        addLog(t("logDnsProtOff"));
       } catch (e) {
-        addLog(`Erro: ${e}`);
+        addLog(t("logError", { error: String(e) }));
       }
     } else {
       try {
         await invoke("enable_dns_protection", { dnsServer });
         setDnsProtOn(true);
-        addLog(`DNS forcado para ${dnsServer}.`);
+        addLog(t("logDnsForced", { server: dnsServer }));
       } catch (e) {
-        addLog(`Erro: ${e}`);
+        addLog(t("logError", { error: String(e) }));
       }
     }
   };
@@ -693,39 +813,33 @@ function App() {
         await invoke("teardown_split_tunnel");
         setSplitTunOn(false);
         setSplitPids([]);
-        addLog("Split tunneling desativado.");
+        addLog(t("logSplitTunOff"));
       } catch (e) {
-        addLog(`Erro: ${e}`);
+        addLog(t("logError", { error: String(e) }));
       }
     } else {
-      if (!wgStatus) {
-        addLog("Conecte a VPN antes de ativar split tunneling.");
-        return;
-      }
+      if (!wgStatus) { addLog(t("logVpnFirstSplit")); return; }
       try {
         await invoke("setup_split_tunnel", { iface: wgStatus.interface_name });
         setSplitTunOn(true);
-        addLog("Split tunneling ativado.");
+        addLog(t("logSplitTunOn"));
       } catch (e) {
-        addLog(`Erro: ${e}`);
+        addLog(t("logError", { error: String(e) }));
       }
     }
   };
 
   const addSplitPid = async () => {
     const pid = parseInt(splitPidInput, 10);
-    if (!pid || pid <= 0) {
-      addLog("PID invalido.");
-      return;
-    }
+    if (!pid || pid <= 0) { addLog(t("logPidInvalid")); return; }
     try {
       await invoke("split_tunnel_add_pid", { pid });
       setSplitPidInput("");
       const pids = await invoke<number[]>("split_tunnel_list_pids");
       setSplitPids(pids);
-      addLog(`PID ${pid} excluido do tunnel.`);
+      addLog(t("logPidExcluded", { pid }));
     } catch (e) {
-      addLog(`Erro: ${e}`);
+      addLog(t("logError", { error: String(e) }));
     }
   };
 
@@ -734,9 +848,9 @@ function App() {
       await invoke("split_tunnel_remove_pid", { pid });
       const pids = await invoke<number[]>("split_tunnel_list_pids");
       setSplitPids(pids);
-      addLog(`PID ${pid} removido do split tunnel.`);
+      addLog(t("logPidRemoved", { pid }));
     } catch (e) {
-      addLog(`Erro: ${e}`);
+      addLog(t("logError", { error: String(e) }));
     }
   };
 
@@ -746,20 +860,13 @@ function App() {
     try {
       const keys = await invoke<string[]>("list_ssh_keys");
       setProvSshKeys(keys);
-      if (keys.length > 0 && !provSshKey) {
-        setProvSshKey(keys[0]);
-      }
-    } catch {
-      /* ignore */
-    }
+      if (keys.length > 0 && !provSshKey) setProvSshKey(keys[0]);
+    } catch { /* ignore */ }
   };
 
   const doRegisterPeer = async () => {
-    if (!provSshHost || !form.public_key) {
-      addLog("Gere as chaves e preencha o SSH Host antes de registrar.");
-      return;
-    }
-    setProvStatus("Registrando peer...");
+    if (!provSshHost || !form.public_key) { addLog(t("logGenKeysFirst")); return; }
+    setProvStatus(t("logRegisteringPeer"));
     try {
       const result = await invoke<string>("register_peer", {
         sshHost: provSshHost,
@@ -770,31 +877,28 @@ function App() {
         clientAllowedIps: form.address || "10.8.0.2/32",
       });
       setProvStatus(result);
-      addLog(`Provisioning: ${result}`);
+      addLog(t("logProvResult", { result }));
     } catch (e) {
       const msg = String(e);
-      setProvStatus(`Erro: ${msg}`);
-      addLog(`Provisioning erro: ${msg}`);
+      setProvStatus(`${t("error")}: ${msg}`);
+      addLog(t("logProvError", { error: msg }));
     }
   };
 
   const doCheckConnectivity = async () => {
-    if (!provSshHost) {
-      addLog("Preencha o SSH Host.");
-      return;
-    }
+    if (!provSshHost) { addLog(t("logFillSshHost")); return; }
     const parts = (form.endpoint || provSshHost).split(":");
     const host = parts[0] || provSshHost;
     const port = parseInt(parts[1] || "51820", 10);
-    setProvStatus("Testando conectividade...");
+    setProvStatus(t("logTestingConn"));
     try {
       const result = await invoke<string>("check_connectivity", { host, port });
       setProvStatus(result);
-      addLog(`Conectividade: ${result}`);
+      addLog(t("logConnResult", { result }));
     } catch (e) {
       const msg = String(e);
-      setProvStatus(`Erro: ${msg}`);
-      addLog(`Conectividade erro: ${msg}`);
+      setProvStatus(`${t("error")}: ${msg}`);
+      addLog(t("logConnError", { error: msg }));
     }
   };
 
@@ -803,21 +907,18 @@ function App() {
       try {
         await invoke("disable_connection_guard");
         setConnGuardOn(false);
-        addLog("Connection guard desativado.");
+        addLog(t("logConnGuardOff"));
       } catch (e) {
-        addLog(`Erro: ${e}`);
+        addLog(t("logError", { error: String(e) }));
       }
     } else {
-      if (!wgStatus) {
-        addLog("Conecte a VPN antes de ativar o connection guard.");
-        return;
-      }
+      if (!wgStatus) { addLog(t("logVpnFirstGuard")); return; }
       try {
         await invoke("enable_connection_guard", { iface: wgStatus.interface_name });
         setConnGuardOn(true);
-        addLog("Connection guard ativado: reconexao automatica.");
+        addLog(t("logConnGuardOn"));
       } catch (e) {
-        addLog(`Erro: ${e}`);
+        addLog(t("logError", { error: String(e) }));
       }
     }
   };
@@ -826,28 +927,28 @@ function App() {
 
   const addSshTunnel = async () => {
     if (!sshForm.name || !sshForm.ssh_host || !sshForm.local_port) {
-      addLog("Preencha nome, SSH host e porta local.");
+      addLog(t("logFillSshRequired"));
       return;
     }
     const tunnel: SshTunnel = { id: crypto.randomUUID(), ...sshForm };
     try {
       await invoke("add_ssh_tunnel", { tunnel });
-      addLog(`Tunnel "${sshForm.name}" salvo.`);
+      addLog(t("logTunnelSaved", { name: sshForm.name }));
       setSshForm(EMPTY_SSH);
       setShowSshForm(false);
       await loadSshTunnels();
     } catch (e) {
-      addLog(`Erro: ${e}`);
+      addLog(t("logError", { error: String(e) }));
     }
   };
 
   const removeSshTunnel = async (id: string) => {
     try {
       await invoke("remove_ssh_tunnel", { tunnelId: id });
-      addLog("Tunnel removido.");
+      addLog(t("logTunnelRemoved"));
       await loadSshTunnels();
     } catch (e) {
-      addLog(`Erro: ${e}`);
+      addLog(t("logError", { error: String(e) }));
     }
   };
 
@@ -855,9 +956,9 @@ function App() {
     try {
       const pid = await invoke<number>("start_ssh_tunnel", { tunnelId: id });
       setSshRunning((prev) => ({ ...prev, [id]: true }));
-      addLog(`Tunnel iniciado (PID ${pid}).`);
+      addLog(t("logTunnelStarted", { pid }));
     } catch (e) {
-      addLog(`Erro: ${e}`);
+      addLog(t("logError", { error: String(e) }));
     }
   };
 
@@ -865,52 +966,43 @@ function App() {
     try {
       await invoke("stop_ssh_tunnel", { tunnelId: id });
       setSshRunning((prev) => ({ ...prev, [id]: false }));
-      addLog("Tunnel parado.");
+      addLog(t("logTunnelStopped"));
     } catch (e) {
-      addLog(`Erro: ${e}`);
+      addLog(t("logError", { error: String(e) }));
     }
   };
 
   // ── Settings handlers ───────────────────────────────────────────
 
   const installPerms = async () => {
-    addLog("Instalando permissoes (uma senha admin necessaria)...");
+    addLog(t("logInstallingPerms"));
     try {
       await invoke("install_permissions");
       setPermInstalled(true);
-      addLog("Permissoes instaladas. Sem mais prompts de senha.");
+      addLog(t("logPermsInstalled"));
     } catch (e) {
-      addLog(`Erro: ${e}`);
+      addLog(t("logError", { error: String(e) }));
     }
   };
 
   const uninstallPerms = async () => {
-    addLog("Removendo permissoes...");
+    addLog(t("logRemovingPerms"));
     try {
       await invoke("uninstall_permissions");
       setPermInstalled(false);
-      addLog("Permissoes removidas.");
+      addLog(t("logPermsRemoved"));
     } catch (e) {
-      addLog(`Erro: ${e}`);
+      addLog(t("logError", { error: String(e) }));
     }
   };
 
   const doCheckUpdate = async () => {
     try {
-      const info = await invoke<{
-        current: string;
-        latest: string;
-        has_update: boolean;
-        url: string;
-      }>("check_update");
+      const info = await invoke<{ current: string; latest: string; has_update: boolean; url: string }>("check_update");
       setUpdateInfo(info);
-      addLog(
-        info.has_update
-          ? `Atualizacao disponivel: v${info.latest}`
-          : `Versao atual (v${info.current}) e a mais recente.`
-      );
+      addLog(info.has_update ? t("logUpdateAvailable", { version: info.latest }) : t("logUpToDate", { version: info.current }));
     } catch (e) {
-      addLog(`Erro ao verificar atualizacao: ${e}`);
+      addLog(t("logUpdateError", { error: String(e) }));
     }
   };
 
@@ -934,1037 +1026,443 @@ function App() {
 
   const selectedProf = profiles.find((p) => p.id === selectedProfile);
 
+  // ── Theme class helpers ─────────────────────────────────────────
+
+  const cardCls = isDark
+    ? "bg-neutral-900 rounded-lg border border-neutral-800 p-4"
+    : "bg-white rounded-lg border border-neutral-200 p-4 shadow-sm";
+
+  const inputCls = isDark
+    ? "bg-neutral-800 border border-neutral-700 text-neutral-200 placeholder-neutral-600"
+    : "bg-neutral-100 border border-neutral-300 text-neutral-800 placeholder-neutral-400";
+
+  const headingCls = isDark ? "text-neutral-300" : "text-neutral-700";
+  const mutedCls = isDark ? "text-neutral-400" : "text-neutral-600";
+  const subtleCls = isDark ? "text-neutral-500" : "text-neutral-500";
+
   // ── Render ──────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-screen bg-neutral-950 text-neutral-100">
-      {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 bg-neutral-900 border-b border-neutral-800">
-        <div className="flex items-center gap-2">
-          <ShieldIcon className="w-5 h-5 text-bullet-500" />
-          <span className="font-semibold text-sm tracking-tight">
-            Bullet VPN
-          </span>
-        </div>
+    <ThemeCtx.Provider value={isDark}>
+      <I18nCtx.Provider value={t}>
+        <div className={`flex flex-col h-screen ${isDark ? "bg-neutral-950 text-neutral-100" : "bg-neutral-50 text-neutral-900"}`}>
+          {/* Header */}
+          <header className={`flex items-center justify-between px-4 py-3 border-b ${isDark ? "bg-neutral-900 border-neutral-800" : "bg-white border-neutral-200 shadow-sm"}`}>
+            <div className="flex items-center gap-2">
+              <ShieldIcon className="w-5 h-5 text-bullet-500" />
+              <span className="font-semibold text-sm tracking-tight">Bullet VPN</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <NavBtn active={view === "vpn"} onClick={() => setView("vpn")} title="VPN"><ShieldIcon className="w-3.5 h-3.5" /></NavBtn>
+              <NavBtn active={view === "ssh"} onClick={() => setView("ssh")} title={t("sshTunnels")}><Terminal className="w-3.5 h-3.5" /></NavBtn>
+              <NavBtn active={view === "settings"} onClick={() => setView("settings")} title={t("settings")}><Settings className="w-3.5 h-3.5" /></NavBtn>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${stateColor[tunnelState]}`} />
+              <span className={`text-xs ${mutedCls}`}>{stateLabel[tunnelState]}</span>
+            </div>
+          </header>
 
-        <div className="flex items-center gap-1">
-          <NavBtn
-            active={view === "vpn"}
-            onClick={() => setView("vpn")}
-            title="VPN"
-          >
-            <ShieldIcon className="w-3.5 h-3.5" />
-          </NavBtn>
-          <NavBtn
-            active={view === "ssh"}
-            onClick={() => setView("ssh")}
-            title={t("sshTunnels")}
-          >
-            <Terminal className="w-3.5 h-3.5" />
-          </NavBtn>
-          <NavBtn
-            active={view === "settings"}
-            onClick={() => setView("settings")}
-            title={t("settings")}
-          >
-            <Settings className="w-3.5 h-3.5" />
-          </NavBtn>
-        </div>
+          {/* Main */}
+          <main className="flex-1 flex flex-col gap-3 p-4 overflow-y-auto">
+            {/* ────── VPN VIEW ────── */}
+            {view === "vpn" && (
+              <>
+                {tunnelState === "error" && errorMsg && (
+                  <div className="bg-red-950 border border-red-800 rounded-lg px-3 py-2 text-xs text-red-300">{errorMsg}</div>
+                )}
 
-        <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${stateColor[tunnelState]}`} />
-          <span className="text-xs text-neutral-400">
-            {stateLabel[tunnelState]}
-          </span>
-        </div>
-      </header>
-
-      {/* Main */}
-      <main className="flex-1 flex flex-col gap-3 p-4 overflow-y-auto">
-        {/* ────── VPN VIEW ────── */}
-        {view === "vpn" && (
-          <>
-            {/* Error banner */}
-            {tunnelState === "error" && errorMsg && (
-              <div className="bg-red-950 border border-red-800 rounded-lg px-3 py-2 text-xs text-red-300">
-                {errorMsg}
-              </div>
-            )}
-
-            {/* Permission warning */}
-            {!permInstalled && (
-              <button
-                onClick={() => setView("settings")}
-                className="bg-yellow-950/50 border border-yellow-800/50 rounded-lg px-3 py-2 text-xs text-yellow-400 text-left hover:bg-yellow-950"
-              >
-                Sem permissoes instaladas -- cada acao pedira senha admin.
-                Clique para configurar.
-              </button>
-            )}
-
-            {/* Profile form */}
-            {showForm ? (
-              <Card>
-                <CardHeader
-                  title="Novo Perfil WireGuard"
-                  onClose={() => setShowForm(false)}
-                />
-                <div className="space-y-2">
-                  <Field
-                    label="Nome *"
-                    placeholder="ProStaff VPS"
-                    value={form.name}
-                    onChange={(v) => setForm({ ...form, name: v })}
-                  />
-                  <Field
-                    label="Endpoint *"
-                    placeholder="187.77.39.215:51820"
-                    value={form.endpoint}
-                    onChange={(v) => setForm({ ...form, endpoint: v })}
-                  />
-                  <Field
-                    label="Server Public Key *"
-                    placeholder="PuSN8/kQY9TOs62JMo9m..."
-                    value={form.server_pubkey}
-                    onChange={(v) => setForm({ ...form, server_pubkey: v })}
-                  />
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        const kp = await invoke<{ private_key: string; public_key: string }>("generate_keypair");
-                        setForm({ ...form, private_key: kp.private_key, public_key: kp.public_key });
-                        addLog("Par de chaves X25519 gerado.");
-                      } catch (e) {
-                        addLog(`Erro ao gerar chaves: ${e}`);
-                      }
-                    }}
-                    className="w-full flex items-center justify-center gap-2 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-bullet-400 text-xs font-medium border border-neutral-700 rounded transition-colors"
-                  >
-                    <Key className="w-3.5 h-3.5" />
-                    Gerar Chaves X25519
+                {!permInstalled && (
+                  <button onClick={() => setView("settings")} className="bg-yellow-950/50 border border-yellow-800/50 rounded-lg px-3 py-2 text-xs text-yellow-400 text-left hover:bg-yellow-950">
+                    {t("noPerms")}
                   </button>
-                  <Field
-                    label="Private Key *"
-                    placeholder="Sua chave privada WireGuard"
-                    value={form.private_key}
-                    onChange={(v) => setForm({ ...form, private_key: v })}
-                    type="password"
-                  />
-                  <div>
-                    <label className="block text-xs text-neutral-500 mb-0.5">Public Key (derivada)</label>
-                    <input
-                      type="text"
-                      readOnly
-                      value={form.public_key}
-                      placeholder="Gerada automaticamente"
-                      className="w-full bg-neutral-800/50 border border-neutral-700 rounded px-3 py-1.5 text-sm text-neutral-400 font-mono cursor-default focus:outline-none"
-                    />
-                  </div>
-                  <Field
-                    label="Address"
-                    placeholder="10.8.0.2/32"
-                    value={form.address}
-                    onChange={(v) => setForm({ ...form, address: v })}
-                  />
-                  <Field
-                    label="Allowed IPs"
-                    placeholder="10.8.0.0/24"
-                    value={form.allowed_ips}
-                    onChange={(v) => setForm({ ...form, allowed_ips: v })}
-                  />
-                  <Field
-                    label="DNS"
-                    placeholder="1.1.1.1"
-                    value={form.dns}
-                    onChange={(v) => setForm({ ...form, dns: v })}
-                  />
-                  {/* Auto-provisioning section */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowProvisioning(!showProvisioning);
-                      if (!showProvisioning) loadSshKeys();
-                    }}
-                    className="w-full flex items-center gap-2 py-1.5 px-3 bg-neutral-800/50 hover:bg-neutral-800 text-neutral-400 text-xs border border-neutral-700 rounded transition-colors"
-                  >
-                    <ChevronRight className={`w-3 h-3 transition-transform ${showProvisioning ? "rotate-90" : ""}`} />
-                    <Upload className="w-3 h-3" />
-                    Auto-provisioning (SSH)
-                  </button>
-                  {showProvisioning && (
-                    <div className="space-y-2 pl-2 border-l-2 border-neutral-800">
-                      <Field
-                        label="SSH Host *"
-                        placeholder="meu-server.com"
-                        value={provSshHost}
-                        onChange={setProvSshHost}
-                      />
-                      <Field
-                        label="SSH User"
-                        placeholder="root"
-                        value={provSshUser}
-                        onChange={setProvSshUser}
-                      />
+                )}
+
+                {showForm ? (
+                  <div className={cardCls}>
+                    <CardHeader title={t("newProfileWg")} onClose={() => setShowForm(false)} />
+                    <div className="space-y-2">
+                      <Field label={t("name")} placeholder="ProStaff VPS" value={form.name} onChange={(v) => setForm({ ...form, name: v })} />
+                      <Field label={t("endpoint")} placeholder="187.77.39.215:51820" value={form.endpoint} onChange={(v) => setForm({ ...form, endpoint: v })} />
+                      <Field label={t("serverPubkey")} placeholder="PuSN8/kQY9TOs62JMo9m..." value={form.server_pubkey} onChange={(v) => setForm({ ...form, server_pubkey: v })} />
+                      <button type="button" onClick={async () => {
+                        try {
+                          const kp = await invoke<{ private_key: string; public_key: string }>("generate_keypair");
+                          setForm({ ...form, private_key: kp.private_key, public_key: kp.public_key });
+                          addLog(t("logKeysGenerated"));
+                        } catch (e) { addLog(t("logKeysError", { error: String(e) })); }
+                      }} className={`w-full flex items-center justify-center gap-2 py-1.5 text-bullet-400 text-xs font-medium border rounded transition-colors ${isDark ? "bg-neutral-800 hover:bg-neutral-700 border-neutral-700" : "bg-neutral-100 hover:bg-neutral-200 border-neutral-300"}`}>
+                        <Key className="w-3.5 h-3.5" />{t("generateKeys")}
+                      </button>
+                      <Field label={t("privateKey")} placeholder="WireGuard private key" value={form.private_key} onChange={(v) => setForm({ ...form, private_key: v })} type="password" />
                       <div>
-                        <label className="block text-xs text-neutral-500 mb-0.5">SSH Key</label>
-                        {provSshKeys.length > 0 ? (
-                          <select
-                            value={provSshKey}
-                            onChange={(e) => setProvSshKey(e.target.value)}
-                            className="w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-1.5 text-sm text-neutral-200 focus:outline-none focus:ring-1 focus:ring-bullet-500"
-                          >
-                            {provSshKeys.map((k) => (
-                              <option key={k} value={k}>{k}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            type="text"
-                            value={provSshKey}
-                            onChange={(e) => setProvSshKey(e.target.value)}
-                            placeholder="~/.ssh/id_ed25519"
-                            className="w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-1.5 text-sm text-neutral-200 placeholder-neutral-600 focus:outline-none focus:ring-1 focus:ring-bullet-500"
-                          />
+                        <label className={`block text-xs ${subtleCls} mb-0.5`}>{t("publicKeyDerived")}</label>
+                        <input type="text" readOnly value={form.public_key} placeholder={t("autoGenerated")} className={`w-full rounded px-3 py-1.5 text-sm font-mono cursor-default focus:outline-none ${isDark ? "bg-neutral-800/50 border border-neutral-700 text-neutral-400" : "bg-neutral-100/50 border border-neutral-300 text-neutral-600"}`} />
+                      </div>
+                      <Field label={t("address")} placeholder="10.8.0.2/32" value={form.address} onChange={(v) => setForm({ ...form, address: v })} />
+                      <Field label={t("allowedIps")} placeholder="10.8.0.0/24" value={form.allowed_ips} onChange={(v) => setForm({ ...form, allowed_ips: v })} />
+                      <Field label={t("dns")} placeholder="1.1.1.1" value={form.dns} onChange={(v) => setForm({ ...form, dns: v })} />
+                      {/* Auto-provisioning */}
+                      <button type="button" onClick={() => { setShowProvisioning(!showProvisioning); if (!showProvisioning) loadSshKeys(); }} className={`w-full flex items-center gap-2 py-1.5 px-3 text-xs border rounded transition-colors ${isDark ? "bg-neutral-800/50 hover:bg-neutral-800 text-neutral-400 border-neutral-700" : "bg-neutral-100/50 hover:bg-neutral-100 text-neutral-600 border-neutral-300"}`}>
+                        <ChevronRight className={`w-3 h-3 transition-transform ${showProvisioning ? "rotate-90" : ""}`} />
+                        <Upload className="w-3 h-3" />{t("autoProvisioning")}
+                      </button>
+                      {showProvisioning && (
+                        <div className={`space-y-2 pl-2 border-l-2 ${isDark ? "border-neutral-800" : "border-neutral-200"}`}>
+                          <Field label={t("sshHost")} placeholder="my-server.com" value={provSshHost} onChange={setProvSshHost} />
+                          <Field label={t("sshUser")} placeholder="root" value={provSshUser} onChange={setProvSshUser} />
+                          <div>
+                            <label className={`block text-xs ${subtleCls} mb-0.5`}>{t("sshKey")}</label>
+                            {provSshKeys.length > 0 ? (
+                              <select value={provSshKey} onChange={(e) => setProvSshKey(e.target.value)} className={`w-full rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-bullet-500 ${inputCls}`}>
+                                {provSshKeys.map((k) => (<option key={k} value={k}>{k}</option>))}
+                              </select>
+                            ) : (
+                              <input type="text" value={provSshKey} onChange={(e) => setProvSshKey(e.target.value)} placeholder="~/.ssh/id_ed25519" className={`w-full rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-bullet-500 ${inputCls}`} />
+                            )}
+                          </div>
+                          <Field label={t("serverIface")} placeholder="wg0" value={provServerIface} onChange={setProvServerIface} />
+                          <div className="flex gap-2">
+                            <button type="button" onClick={doRegisterPeer} disabled={!form.public_key || !provSshHost} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-bullet-600 hover:bg-bullet-700 text-white text-xs font-medium rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                              <Upload className="w-3 h-3" />{t("registerPeer")}
+                            </button>
+                            <button type="button" onClick={doCheckConnectivity} disabled={!provSshHost} className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${isDark ? "bg-neutral-700 hover:bg-neutral-600 text-neutral-200" : "bg-neutral-200 hover:bg-neutral-300 text-neutral-800"}`}>
+                              <Wifi className="w-3 h-3" />{t("testConnection")}
+                            </button>
+                          </div>
+                          {provStatus && (
+                            <p className={`text-[10px] px-1 ${provStatus.startsWith(t("error")) ? "text-red-400" : "text-bullet-400"}`}>{provStatus}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <GreenBtn onClick={addProfile}>{t("saveProfile")}</GreenBtn>
+                  </div>
+                ) : showImport ? (
+                  <div className={cardCls}>
+                    <CardHeader title={t("importConf")} onClose={() => setShowImport(false)} />
+                    <textarea value={importText} onChange={(e) => setImportText(e.target.value)} placeholder={t("pasteConf")} className={`w-full h-40 rounded px-3 py-2 text-xs font-mono resize-none focus:outline-none focus:ring-1 focus:ring-bullet-500 ${inputCls}`} />
+                    <GreenBtn onClick={importConf}>{t("import")}</GreenBtn>
+                  </div>
+                ) : (
+                  <div className={cardCls}>
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className={`text-sm font-medium ${headingCls}`}>{t("profile")}</h2>
+                      <div className="flex items-center gap-1">
+                        {selectedProfile && (<IconBtn onClick={removeProfile} disabled={tunnelState !== "disconnected"} title={t("removeProfile")} className="hover:text-red-400"><Trash2 className="w-4 h-4" /></IconBtn>)}
+                        <IconBtn onClick={() => setShowImport(true)} title={t("importConf")}><Import className="w-4 h-4" /></IconBtn>
+                        <IconBtn onClick={() => setShowForm(true)} title={t("newProfile")}><Plus className="w-4 h-4" /></IconBtn>
+                      </div>
+                    </div>
+                    {profiles.length === 0 ? (
+                      <button onClick={() => setShowForm(true)} className={`w-full py-6 border-2 border-dashed rounded-lg text-sm transition-colors ${isDark ? "border-neutral-700 text-neutral-500 hover:text-neutral-300 hover:border-neutral-500" : "border-neutral-300 text-neutral-500 hover:text-neutral-700 hover:border-neutral-400"}`}>
+                        {t("addProfilePrompt")}
+                      </button>
+                    ) : (
+                      <div className="relative">
+                        <select value={selectedProfile ?? ""} onChange={(e) => setSelectedProfile(e.target.value)} disabled={tunnelState === "connected" || tunnelState === "connecting"} className={`w-full rounded px-3 py-2 text-sm appearance-none pr-8 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-bullet-500 ${inputCls}`}>
+                          {profiles.map((p) => (<option key={p.id} value={p.id}>[{p.vpn_type === "openvpn" ? "OVPN" : "WG"}] {p.name} -- {p.endpoint}</option>))}
+                        </select>
+                        <ChevronDown className={`absolute right-2 top-2.5 w-4 h-4 pointer-events-none ${subtleCls}`} />
+                      </div>
+                    )}
+                    {profiles.length > 0 && (
+                      <button onClick={tunnelState === "connected" || tunnelState === "error" ? disconnectVpn : connectVpn} disabled={tunnelState === "connecting" || tunnelState === "disconnecting" || !selectedProfile} className={`mt-3 w-full py-3 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2 ${tunnelState === "connected" || tunnelState === "error" ? "bg-red-600 hover:bg-red-700 text-white" : "bg-bullet-600 hover:bg-bullet-700 text-white"} disabled:opacity-50 disabled:cursor-not-allowed`}>
+                        {tunnelState === "connecting" || tunnelState === "disconnecting" ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldIcon className="w-4 h-4" />}
+                        {tunnelState === "connecting" ? t("connecting") : tunnelState === "disconnecting" ? t("disconnecting") : tunnelState === "connected" ? t("disconnect") : tunnelState === "error" ? t("disconnectClearError") : t("connect")}
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Security toggles */}
+                {(tunnelState === "connected" || killswitchOn || dnsProtOn || splitTunOn || connGuardOn) && (
+                  <div className={cardCls}>
+                    <h2 className={`text-xs font-medium uppercase tracking-wider mb-3 ${subtleCls}`}>{t("security")}</h2>
+                    <div className="space-y-2">
+                      <Toggle icon={<Lock className="w-3.5 h-3.5" />} label={t("killSwitch")} sublabel={t("killSwitchSub")} active={killswitchOn} onClick={toggleKillswitch} />
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <Toggle icon={<Globe className="w-3.5 h-3.5" />} label={t("dnsProtection")} sublabel={t("dnsForcePrefix", { server: dnsServer })} active={dnsProtOn} onClick={toggleDnsProtection} />
+                        </div>
+                        {!dnsProtOn && (
+                          <input type="text" value={dnsServer} onChange={(e) => setDnsServer(e.target.value)} className={`w-28 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-bullet-500 ${isDark ? "bg-neutral-800 border border-neutral-700 text-neutral-300" : "bg-neutral-100 border border-neutral-300 text-neutral-700"}`} placeholder="1.1.1.1" />
                         )}
                       </div>
-                      <Field
-                        label="Server Interface"
-                        placeholder="wg0"
-                        value={provServerIface}
-                        onChange={setProvServerIface}
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={doRegisterPeer}
-                          disabled={!form.public_key || !provSshHost}
-                          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-bullet-600 hover:bg-bullet-700 text-white text-xs font-medium rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          <Upload className="w-3 h-3" />
-                          Registrar Peer
-                        </button>
-                        <button
-                          type="button"
-                          onClick={doCheckConnectivity}
-                          disabled={!provSshHost}
-                          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-neutral-700 hover:bg-neutral-600 text-neutral-200 text-xs font-medium rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          <Wifi className="w-3 h-3" />
-                          Testar Conexao
-                        </button>
-                      </div>
-                      {provStatus && (
-                        <p className={`text-[10px] px-1 ${provStatus.startsWith("Erro") ? "text-red-400" : "text-bullet-400"}`}>
-                          {provStatus}
-                        </p>
+                      <Toggle icon={<Scissors className="w-3.5 h-3.5" />} label={t("splitTunneling")} sublabel={t("splitTunnelSub")} active={splitTunOn} onClick={toggleSplitTunnel} />
+                      {splitTunOn && (
+                        <div className="ml-6 space-y-2">
+                          <div className="flex gap-1">
+                            <input type="text" value={splitPidInput} onChange={(e) => setSplitPidInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addSplitPid()} placeholder={t("pidPlaceholder")} className={`flex-1 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-bullet-500 ${isDark ? "bg-neutral-800 border border-neutral-700 text-neutral-300" : "bg-neutral-100 border border-neutral-300 text-neutral-700"}`} />
+                            <button onClick={addSplitPid} className="px-2 py-1 bg-bullet-600 text-white text-xs rounded hover:bg-bullet-700 transition-colors">{t("exclude")}</button>
+                          </div>
+                          {splitPids.length > 0 && (
+                            <div className="space-y-1">
+                              {splitPids.map((pid) => (
+                                <div key={pid} className={`flex items-center justify-between rounded px-2 py-1 ${isDark ? "bg-neutral-800/50" : "bg-neutral-100"}`}>
+                                  <span className={`text-xs font-mono ${mutedCls}`}>PID {pid}</span>
+                                  <button onClick={() => removeSplitPid(pid)} className={`transition-colors ${isDark ? "text-neutral-500 hover:text-red-400" : "text-neutral-400 hover:text-red-500"}`}><X className="w-3 h-3" /></button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       )}
+                      <Toggle icon={connGuardOn ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />} label={t("connGuard")} sublabel={t("connGuardSub")} active={connGuardOn} onClick={toggleConnectionGuard} />
                     </div>
-                  )}
-                </div>
-                <GreenBtn onClick={addProfile}>Salvar Perfil</GreenBtn>
-              </Card>
-            ) : showImport ? (
-              <Card>
-                <CardHeader
-                  title="Importar .conf / .ovpn"
-                  onClose={() => setShowImport(false)}
-                />
-                <textarea
-                  value={importText}
-                  onChange={(e) => setImportText(e.target.value)}
-                  placeholder="Cole o conteudo do arquivo .conf (WireGuard) ou .ovpn (OpenVPN) aqui..."
-                  className="w-full h-40 bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-xs font-mono text-neutral-200 placeholder-neutral-600 focus:outline-none focus:ring-1 focus:ring-bullet-500 resize-none"
-                />
-                <GreenBtn onClick={importConf}>Importar</GreenBtn>
-              </Card>
-            ) : (
-              /* Profile selector */
-              <Card>
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-sm font-medium text-neutral-300">
-                    Perfil
-                  </h2>
-                  <div className="flex items-center gap-1">
-                    {selectedProfile && (
-                      <IconBtn
-                        onClick={removeProfile}
-                        disabled={tunnelState !== "disconnected"}
-                        title="Remover perfil"
-                        className="hover:text-red-400"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </IconBtn>
-                    )}
-                    <IconBtn
-                      onClick={() => setShowImport(true)}
-                      title="Importar .conf / .ovpn"
-                    >
-                      <Import className="w-4 h-4" />
-                    </IconBtn>
-                    <IconBtn onClick={() => setShowForm(true)} title="Novo perfil">
-                      <Plus className="w-4 h-4" />
-                    </IconBtn>
-                  </div>
-                </div>
-
-                {profiles.length === 0 ? (
-                  <button
-                    onClick={() => setShowForm(true)}
-                    className="w-full py-6 border-2 border-dashed border-neutral-700 rounded-lg text-neutral-500 hover:text-neutral-300 hover:border-neutral-500 transition-colors text-sm"
-                  >
-                    Adicione um perfil VPN para comecar
-                  </button>
-                ) : (
-                  <div className="relative">
-                    <select
-                      value={selectedProfile ?? ""}
-                      onChange={(e) => setSelectedProfile(e.target.value)}
-                      disabled={
-                        tunnelState === "connected" ||
-                        tunnelState === "connecting"
-                      }
-                      className="w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm text-neutral-200 focus:outline-none focus:ring-1 focus:ring-bullet-500 appearance-none pr-8 disabled:opacity-50"
-                    >
-                      {profiles.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          [{p.vpn_type === "openvpn" ? "OVPN" : "WG"}]{" "}
-                          {p.name} -- {p.endpoint}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-2 top-2.5 w-4 h-4 text-neutral-500 pointer-events-none" />
                   </div>
                 )}
 
-                {/* Connect button */}
-                {profiles.length > 0 && (
-                  <button
-                    onClick={
-                      tunnelState === "connected" || tunnelState === "error"
-                        ? disconnectVpn
-                        : connectVpn
-                    }
-                    disabled={
-                      tunnelState === "connecting" ||
-                      tunnelState === "disconnecting" ||
-                      !selectedProfile
-                    }
-                    className={`mt-3 w-full py-3 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2 ${
-                      tunnelState === "connected" || tunnelState === "error"
-                        ? "bg-red-600 hover:bg-red-700 text-white"
-                        : "bg-bullet-600 hover:bg-bullet-700 text-white"
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    {tunnelState === "connecting" ||
-                    tunnelState === "disconnecting" ? (
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <ShieldIcon className="w-4 h-4" />
-                    )}
-                    {tunnelState === "connecting"
-                      ? t("connecting")
-                      : tunnelState === "disconnecting"
-                        ? t("disconnecting")
-                        : tunnelState === "connected"
-                          ? t("disconnect")
-                          : tunnelState === "error"
-                            ? t("disconnectClearError")
-                            : t("connect")}
-                  </button>
+                {/* Status panel */}
+                {(tunnelState === "connected" || tunnelState === "disconnecting") && wgStatus && (
+                  <div className={cardCls}>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Stat label={t("type")} value={wgStatus.vpn_type === "openvpn" ? "OpenVPN" : "WireGuard"} />
+                      <Stat label={t("interface")} value={wgStatus.interface_name} />
+                      <Stat label="RX" value={wgStatus.transfer_rx} />
+                      <Stat label="TX" value={wgStatus.transfer_tx} />
+                      {wgStatus.endpoint && <Stat label="Endpoint" value={wgStatus.endpoint} />}
+                      {selectedProf && <Stat label={t("profile")} value={selectedProf.name} />}
+                    </div>
+                  </div>
                 )}
-              </Card>
+
+                <LogPanel logs={logs} onClear={() => setLogs([])} />
+              </>
             )}
 
-            {/* Security toggles */}
-            {(tunnelState === "connected" ||
-              killswitchOn ||
-              dnsProtOn ||
-              splitTunOn ||
-              connGuardOn) && (
-              <Card>
-                <h2 className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-3">
-                  {t("security")}
-                </h2>
-                <div className="space-y-2">
-                  <Toggle
-                    icon={<Lock className="w-3.5 h-3.5" />}
-                    label={t("killSwitch")}
-                    sublabel={t("killSwitchSub")}
-                    active={killswitchOn}
-                    onClick={toggleKillswitch}
-                  />
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1">
-                      <Toggle
-                        icon={<Globe className="w-3.5 h-3.5" />}
-                        label={t("dnsProtection")}
-                        sublabel={`${t("dnsProtection")} → ${dnsServer}`}
-                        active={dnsProtOn}
-                        onClick={toggleDnsProtection}
-                      />
-                    </div>
-                    {!dnsProtOn && (
-                      <input
-                        type="text"
-                        value={dnsServer}
-                        onChange={(e) => setDnsServer(e.target.value)}
-                        className="w-28 bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-xs text-neutral-300 focus:outline-none focus:ring-1 focus:ring-bullet-500"
-                        placeholder="1.1.1.1"
-                      />
-                    )}
-                  </div>
-                  <Toggle
-                    icon={<Scissors className="w-3.5 h-3.5" />}
-                    label={t("splitTunneling")}
-                    sublabel={t("splitTunnelSub")}
-                    active={splitTunOn}
-                    onClick={toggleSplitTunnel}
-                  />
-                  {splitTunOn && (
-                    <div className="ml-6 space-y-2">
-                      <div className="flex gap-1">
-                        <input
-                          type="text"
-                          value={splitPidInput}
-                          onChange={(e) => setSplitPidInput(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && addSplitPid()}
-                          placeholder={t("pidPlaceholder")}
-                          className="flex-1 bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-xs text-neutral-300 font-mono focus:outline-none focus:ring-1 focus:ring-bullet-500"
-                        />
-                        <button
-                          onClick={addSplitPid}
-                          className="px-2 py-1 bg-bullet-600 text-white text-xs rounded hover:bg-bullet-700 transition-colors"
-                        >
-                          {t("exclude")}
-                        </button>
+            {/* ────── SSH VIEW ────── */}
+            {view === "ssh" && (
+              <>
+                {showSshForm ? (
+                  <div className={cardCls}>
+                    <CardHeader title={t("newSshTunnel")} onClose={() => setShowSshForm(false)} />
+                    <div className="space-y-2">
+                      <Field label={t("name")} placeholder="DBeaver PostgreSQL" value={sshForm.name} onChange={(v) => setSshForm({ ...sshForm, name: v })} />
+                      <div>
+                        <label className={`block text-xs ${subtleCls} mb-0.5`}>{t("tunnelType")}</label>
+                        <select value={sshForm.tunnel_type} onChange={(e) => setSshForm({ ...sshForm, tunnel_type: e.target.value as SshTunnel["tunnel_type"] })} className={`w-full rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-bullet-500 ${inputCls}`}>
+                          <option value="local">Local (-L)</option>
+                          <option value="remote">Remote (-R)</option>
+                          <option value="dynamic">Dynamic SOCKS (-D)</option>
+                        </select>
                       </div>
-                      {splitPids.length > 0 && (
-                        <div className="space-y-1">
-                          {splitPids.map((pid) => (
-                            <div
-                              key={pid}
-                              className="flex items-center justify-between bg-neutral-800/50 rounded px-2 py-1"
-                            >
-                              <span className="text-xs text-neutral-400 font-mono">
-                                PID {pid}
-                              </span>
-                              <button
-                                onClick={() => removeSplitPid(pid)}
-                                className="text-neutral-500 hover:text-red-400 transition-colors"
-                              >
-                                <X className="w-3 h-3" />
+                      <Field label={t("localPort")} placeholder="15432" value={sshForm.local_port ? String(sshForm.local_port) : ""} onChange={(v) => setSshForm({ ...sshForm, local_port: Number(v) || 0 })} />
+                      {sshForm.tunnel_type !== "dynamic" && (
+                        <>
+                          <Field label={t("remoteHost")} placeholder="127.0.0.1" value={sshForm.remote_host} onChange={(v) => setSshForm({ ...sshForm, remote_host: v })} />
+                          <Field label={t("remotePort")} placeholder="5432" value={sshForm.remote_port ? String(sshForm.remote_port) : ""} onChange={(v) => setSshForm({ ...sshForm, remote_port: Number(v) || 0 })} />
+                        </>
+                      )}
+                      <Field label={t("sshHost")} placeholder="my-vps.com" value={sshForm.ssh_host} onChange={(v) => setSshForm({ ...sshForm, ssh_host: v })} />
+                      <Field label={t("sshUser")} placeholder="root" value={sshForm.ssh_user} onChange={(v) => setSshForm({ ...sshForm, ssh_user: v })} />
+                      <Field label={t("sshKey")} placeholder="~/.ssh/id_ed25519" value={sshForm.ssh_key} onChange={(v) => setSshForm({ ...sshForm, ssh_key: v })} />
+                    </div>
+                    <GreenBtn onClick={addSshTunnel}>{t("saveTunnel")}</GreenBtn>
+                  </div>
+                ) : (
+                  <div className={cardCls}>
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className={`text-sm font-medium ${headingCls}`}>{t("sshTunnels")}</h2>
+                      <IconBtn onClick={() => setShowSshForm(true)} title={t("newTunnel")}><Plus className="w-4 h-4" /></IconBtn>
+                    </div>
+                    {sshTunnels.length === 0 ? (
+                      <button onClick={() => setShowSshForm(true)} className={`w-full py-6 border-2 border-dashed rounded-lg text-sm transition-colors ${isDark ? "border-neutral-700 text-neutral-500 hover:text-neutral-300 hover:border-neutral-500" : "border-neutral-300 text-neutral-500 hover:text-neutral-700 hover:border-neutral-400"}`}>
+                        {t("addSshTunnel")}
+                      </button>
+                    ) : (
+                      <div className="space-y-2">
+                        {sshTunnels.map((tun) => {
+                          const running = sshRunning[tun.id] || false;
+                          const typeLabel = tun.tunnel_type === "dynamic" ? "SOCKS" : tun.tunnel_type === "remote" ? "R" : "L";
+                          const portInfo = tun.tunnel_type === "dynamic" ? `:${tun.local_port}` : `:${tun.local_port} -> ${tun.remote_host}:${tun.remote_port}`;
+                          return (
+                            <div key={tun.id} className={`flex items-center gap-2 rounded-lg px-3 py-2 ${isDark ? "bg-neutral-800" : "bg-neutral-100"}`}>
+                              <div className={`w-2 h-2 rounded-full ${running ? "bg-bullet-500" : "bg-neutral-600"}`} />
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-sm truncate ${isDark ? "text-neutral-200" : "text-neutral-800"}`}>[{typeLabel}] {tun.name}</p>
+                                <p className={`text-[10px] font-mono truncate ${subtleCls}`}>{tun.ssh_user}@{tun.ssh_host} {portInfo}</p>
+                              </div>
+                              <button onClick={() => running ? stopSshTunnel(tun.id) : startSshTunnel(tun.id)} className={`p-1.5 rounded transition-colors ${running ? "text-red-400 hover:bg-red-950" : "text-bullet-400 hover:bg-bullet-950"}`} title={running ? t("stop") : t("start")}>
+                                {running ? <Square className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                              </button>
+                              <button onClick={() => removeSshTunnel(tun.id)} disabled={running} className={`p-1.5 rounded transition-colors disabled:opacity-30 ${isDark ? "text-neutral-500 hover:text-red-400 hover:bg-red-950/50" : "text-neutral-400 hover:text-red-500 hover:bg-red-100"}`} title={t("remove")}>
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <Toggle
-                    icon={connGuardOn ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
-                    label={t("connGuard")}
-                    sublabel={t("connGuardSub")}
-                    active={connGuardOn}
-                    onClick={toggleConnectionGuard}
-                  />
-                </div>
-              </Card>
-            )}
-
-            {/* Status panel */}
-            {(tunnelState === "connected" || tunnelState === "disconnecting") &&
-              wgStatus && (
-                <Card>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Stat
-                      label="Tipo"
-                      value={
-                        wgStatus.vpn_type === "openvpn"
-                          ? "OpenVPN"
-                          : "WireGuard"
-                      }
-                    />
-                    <Stat label="Interface" value={wgStatus.interface_name} />
-                    <Stat label="RX" value={wgStatus.transfer_rx} />
-                    <Stat label="TX" value={wgStatus.transfer_tx} />
-                    {wgStatus.endpoint && (
-                      <Stat label="Endpoint" value={wgStatus.endpoint} />
-                    )}
-                    {selectedProf && (
-                      <Stat
-                        label="Perfil"
-                        value={selectedProf.name}
-                      />
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
-                </Card>
-              )}
+                )}
+                <LogPanel logs={logs} onClear={() => setLogs([])} />
+              </>
+            )}
 
-            {/* Logs */}
-            <LogPanel logs={logs} onClear={() => setLogs([])} />
-          </>
-        )}
-
-        {/* ────── SSH VIEW ────── */}
-        {view === "ssh" && (
-          <>
-            {showSshForm ? (
-              <Card>
-                <CardHeader
-                  title="Novo SSH Tunnel"
-                  onClose={() => setShowSshForm(false)}
-                />
-                <div className="space-y-2">
-                  <Field
-                    label="Nome *"
-                    placeholder="DBeaver PostgreSQL"
-                    value={sshForm.name}
-                    onChange={(v) => setSshForm({ ...sshForm, name: v })}
-                  />
-                  <div>
-                    <label className="block text-xs text-neutral-500 mb-0.5">
-                      Tipo
-                    </label>
-                    <select
-                      value={sshForm.tunnel_type}
-                      onChange={(e) =>
-                        setSshForm({
-                          ...sshForm,
-                          tunnel_type: e.target.value as SshTunnel["tunnel_type"],
-                        })
-                      }
-                      className="w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-1.5 text-sm text-neutral-200 focus:outline-none focus:ring-1 focus:ring-bullet-500"
-                    >
-                      <option value="local">Local (-L)</option>
-                      <option value="remote">Remote (-R)</option>
-                      <option value="dynamic">Dynamic SOCKS (-D)</option>
+            {/* ────── SETTINGS VIEW ────── */}
+            {view === "settings" && (
+              <>
+                {/* Language */}
+                <div className={cardCls}>
+                  <h2 className={`text-sm font-medium ${headingCls} mb-3`}>{t("language")}</h2>
+                  <div className="flex gap-2">
+                    <button onClick={() => setLocale("pt-BR")} className={`flex-1 py-2 text-xs font-medium rounded transition-colors ${locale === "pt-BR" ? "bg-bullet-600 text-white" : isDark ? "bg-neutral-800 text-neutral-400 hover:bg-neutral-700" : "bg-neutral-200 text-neutral-600 hover:bg-neutral-300"}`}>Portugues</button>
+                    <button onClick={() => setLocale("en-US")} className={`flex-1 py-2 text-xs font-medium rounded transition-colors ${locale === "en-US" ? "bg-bullet-600 text-white" : isDark ? "bg-neutral-800 text-neutral-400 hover:bg-neutral-700" : "bg-neutral-200 text-neutral-600 hover:bg-neutral-300"}`}>English</button>
+                  </div>
+                </div>
+                {/* Theme */}
+                <div className={cardCls}>
+                  <h2 className={`text-sm font-medium ${headingCls} mb-3`}>{t("theme")}</h2>
+                  <div className="flex gap-2">
+                    <button onClick={() => setTheme("dark")} className={`flex-1 py-2 text-xs font-medium rounded transition-colors ${theme === "dark" ? "bg-bullet-600 text-white" : isDark ? "bg-neutral-800 text-neutral-400 hover:bg-neutral-700" : "bg-neutral-200 text-neutral-600 hover:bg-neutral-300"}`}>{t("dark")}</button>
+                    <button onClick={() => setTheme("light")} className={`flex-1 py-2 text-xs font-medium rounded transition-colors ${theme === "light" ? "bg-bullet-600 text-white" : isDark ? "bg-neutral-800 text-neutral-400 hover:bg-neutral-700" : "bg-neutral-200 text-neutral-600 hover:bg-neutral-300"}`}>{t("light")}</button>
+                  </div>
+                </div>
+                {/* Permissions */}
+                <div className={cardCls}>
+                  <h2 className={`text-sm font-medium ${headingCls} mb-3`}>{t("systemPerms")}</h2>
+                  <p className={`text-xs ${subtleCls} mb-3`}>{t("permsDesc")}</p>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${permInstalled ? "bg-bullet-500" : "bg-neutral-600"}`} />
+                    <span className={`text-xs ${mutedCls} flex-1`}>{permInstalled ? t("installed") : t("notInstalled")}</span>
+                    {permInstalled ? (
+                      <button onClick={uninstallPerms} className="px-3 py-1.5 bg-red-600/20 text-red-400 text-xs rounded hover:bg-red-600/30 transition-colors">{t("remove")}</button>
+                    ) : (
+                      <button onClick={installPerms} className="px-3 py-1.5 bg-bullet-600 text-white text-xs rounded hover:bg-bullet-700 transition-colors">{t("install")}</button>
+                    )}
+                  </div>
+                </div>
+                {/* DNS config */}
+                <div className={cardCls}>
+                  <h2 className={`text-sm font-medium ${headingCls} mb-3`}>{t("defaultDns")}</h2>
+                  <div className="flex gap-2">
+                    <input type="text" value={dnsServer} onChange={(e) => setDnsServer(e.target.value)} className={`flex-1 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-bullet-500 ${inputCls}`} placeholder="1.1.1.1" />
+                    <select onChange={(e) => setDnsServer(e.target.value)} className={`rounded px-2 py-1.5 text-xs focus:outline-none ${isDark ? "bg-neutral-800 border border-neutral-700 text-neutral-400" : "bg-neutral-100 border border-neutral-300 text-neutral-600"}`}>
+                      <option value="1.1.1.1">Cloudflare</option>
+                      <option value="9.9.9.9">Quad9</option>
+                      <option value="8.8.8.8">Google</option>
+                      <option value="208.67.222.222">OpenDNS</option>
                     </select>
                   </div>
-                  <Field
-                    label="Porta Local *"
-                    placeholder="15432"
-                    value={sshForm.local_port ? String(sshForm.local_port) : ""}
-                    onChange={(v) =>
-                      setSshForm({ ...sshForm, local_port: Number(v) || 0 })
-                    }
-                  />
-                  {sshForm.tunnel_type !== "dynamic" && (
-                    <>
-                      <Field
-                        label="Remote Host"
-                        placeholder="127.0.0.1"
-                        value={sshForm.remote_host}
-                        onChange={(v) =>
-                          setSshForm({ ...sshForm, remote_host: v })
-                        }
-                      />
-                      <Field
-                        label="Remote Port"
-                        placeholder="5432"
-                        value={
-                          sshForm.remote_port
-                            ? String(sshForm.remote_port)
-                            : ""
-                        }
-                        onChange={(v) =>
-                          setSshForm({
-                            ...sshForm,
-                            remote_port: Number(v) || 0,
-                          })
-                        }
-                      />
-                    </>
-                  )}
-                  <Field
-                    label="SSH Host *"
-                    placeholder="my-vps.com"
-                    value={sshForm.ssh_host}
-                    onChange={(v) => setSshForm({ ...sshForm, ssh_host: v })}
-                  />
-                  <Field
-                    label="SSH User"
-                    placeholder="root"
-                    value={sshForm.ssh_user}
-                    onChange={(v) => setSshForm({ ...sshForm, ssh_user: v })}
-                  />
-                  <Field
-                    label="SSH Key"
-                    placeholder="~/.ssh/id_ed25519"
-                    value={sshForm.ssh_key}
-                    onChange={(v) => setSshForm({ ...sshForm, ssh_key: v })}
-                  />
                 </div>
-                <GreenBtn onClick={addSshTunnel}>Salvar Tunnel</GreenBtn>
-              </Card>
-            ) : (
-              <Card>
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-sm font-medium text-neutral-300">
-                    SSH Tunnels
-                  </h2>
-                  <IconBtn
-                    onClick={() => setShowSshForm(true)}
-                    title="Novo tunnel"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </IconBtn>
-                </div>
-
-                {sshTunnels.length === 0 ? (
-                  <button
-                    onClick={() => setShowSshForm(true)}
-                    className="w-full py-6 border-2 border-dashed border-neutral-700 rounded-lg text-neutral-500 hover:text-neutral-300 hover:border-neutral-500 transition-colors text-sm"
-                  >
-                    Adicione um SSH tunnel
-                  </button>
-                ) : (
-                  <div className="space-y-2">
-                    {sshTunnels.map((t) => {
-                      const running = sshRunning[t.id] || false;
-                      const typeLabel =
-                        t.tunnel_type === "dynamic"
-                          ? "SOCKS"
-                          : t.tunnel_type === "remote"
-                            ? "R"
-                            : "L";
-                      const portInfo =
-                        t.tunnel_type === "dynamic"
-                          ? `:${t.local_port}`
-                          : `:${t.local_port} -> ${t.remote_host}:${t.remote_port}`;
-
-                      return (
-                        <div
-                          key={t.id}
-                          className="flex items-center gap-2 bg-neutral-800 rounded-lg px-3 py-2"
-                        >
-                          <div
-                            className={`w-2 h-2 rounded-full ${running ? "bg-bullet-500" : "bg-neutral-600"}`}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm text-neutral-200 truncate">
-                              [{typeLabel}] {t.name}
-                            </p>
-                            <p className="text-[10px] text-neutral-500 font-mono truncate">
-                              {t.ssh_user}@{t.ssh_host} {portInfo}
-                            </p>
-                          </div>
-                          <button
-                            onClick={() =>
-                              running
-                                ? stopSshTunnel(t.id)
-                                : startSshTunnel(t.id)
-                            }
-                            className={`p-1.5 rounded transition-colors ${
-                              running
-                                ? "text-red-400 hover:bg-red-950"
-                                : "text-bullet-400 hover:bg-bullet-950"
-                            }`}
-                            title={running ? "Parar" : "Iniciar"}
-                          >
-                            {running ? (
-                              <Square className="w-3.5 h-3.5" />
-                            ) : (
-                              <Play className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                          <button
-                            onClick={() => removeSshTunnel(t.id)}
-                            disabled={running}
-                            className="p-1.5 rounded text-neutral-500 hover:text-red-400 hover:bg-red-950/50 transition-colors disabled:opacity-30"
-                            title="Remover"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      );
-                    })}
+                {/* Update check */}
+                <div className={cardCls}>
+                  <h2 className={`text-sm font-medium ${headingCls} mb-3`}>{t("update")}</h2>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs ${mutedCls} flex-1`}>
+                      {updateInfo ? (updateInfo.has_update ? `v${updateInfo.latest} ${t("available")}` : `v${updateInfo.current} (${t("current")})`) : t("checkUpdates")}
+                    </span>
+                    <button onClick={doCheckUpdate} className={`px-3 py-1.5 text-xs rounded transition-colors flex items-center gap-1.5 ${isDark ? "bg-neutral-800 text-neutral-300 hover:bg-neutral-700" : "bg-neutral-200 text-neutral-700 hover:bg-neutral-300"}`}>
+                      <RefreshCw className="w-3 h-3" />{t("verify")}
+                    </button>
                   </div>
-                )}
-              </Card>
+                  {updateInfo?.has_update && updateInfo.url && (<p className="mt-2 text-xs text-bullet-400">Download: {updateInfo.url}</p>)}
+                </div>
+                {/* About */}
+                <div className={cardCls}>
+                  <h2 className={`text-sm font-medium ${headingCls} mb-3`}>{t("about")}</h2>
+                  <div className={`space-y-1 text-xs ${subtleCls}`}>
+                    <p>Bullet VPN v2.1.0</p>
+                    <p>Tauri 2 + React 19 + Rust</p>
+                    <p>WireGuard + OpenVPN + Split Tunnel + Auto-Provisioning</p>
+                    <p className={`pt-1 ${isDark ? "text-neutral-700" : "text-neutral-400"}`}>effront</p>
+                  </div>
+                </div>
+                <LogPanel logs={logs} onClear={() => setLogs([])} />
+              </>
             )}
+          </main>
 
-            <LogPanel logs={logs} onClear={() => setLogs([])} />
-          </>
-        )}
-
-        {/* ────── SETTINGS VIEW ────── */}
-        {view === "settings" && (
-          <>
-            {/* Permissions */}
-            <Card>
-              <h2 className="text-sm font-medium text-neutral-300 mb-3">
-                {t("systemPerms")}
-              </h2>
-              <p className="text-xs text-neutral-500 mb-3">
-                {t("permsDesc")}
-              </p>
-              <div className="flex items-center gap-2">
-                <div
-                  className={`w-2 h-2 rounded-full ${permInstalled ? "bg-bullet-500" : "bg-neutral-600"}`}
-                />
-                <span className="text-xs text-neutral-400 flex-1">
-                  {permInstalled ? t("installed") : t("notInstalled")}
-                </span>
-                {permInstalled ? (
-                  <button
-                    onClick={uninstallPerms}
-                    className="px-3 py-1.5 bg-red-600/20 text-red-400 text-xs rounded hover:bg-red-600/30 transition-colors"
-                  >
-                    {t("remove")}
-                  </button>
-                ) : (
-                  <button
-                    onClick={installPerms}
-                    className="px-3 py-1.5 bg-bullet-600 text-white text-xs rounded hover:bg-bullet-700 transition-colors"
-                  >
-                    {t("install")}
-                  </button>
-                )}
-              </div>
-            </Card>
-
-            {/* DNS config */}
-            <Card>
-              <h2 className="text-sm font-medium text-neutral-300 mb-3">
-                {t("defaultDns")}
-              </h2>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={dnsServer}
-                  onChange={(e) => setDnsServer(e.target.value)}
-                  className="flex-1 bg-neutral-800 border border-neutral-700 rounded px-3 py-1.5 text-sm text-neutral-200 focus:outline-none focus:ring-1 focus:ring-bullet-500"
-                  placeholder="1.1.1.1"
-                />
-                <select
-                  onChange={(e) => setDnsServer(e.target.value)}
-                  className="bg-neutral-800 border border-neutral-700 rounded px-2 py-1.5 text-xs text-neutral-400 focus:outline-none"
-                >
-                  <option value="1.1.1.1">Cloudflare</option>
-                  <option value="9.9.9.9">Quad9</option>
-                  <option value="8.8.8.8">Google</option>
-                  <option value="208.67.222.222">OpenDNS</option>
-                </select>
-              </div>
-            </Card>
-
-            {/* Theme */}
-            <Card>
-              <h2 className="text-sm font-medium text-neutral-300 mb-3">
-                {t("theme")}
-              </h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setTheme("dark")}
-                  className={`flex-1 py-2 text-xs font-medium rounded transition-colors ${
-                    theme === "dark"
-                      ? "bg-bullet-600 text-white"
-                      : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
-                  }`}
-                >
-                  {t("dark")}
-                </button>
-                <button
-                  onClick={() => setTheme("light")}
-                  className={`flex-1 py-2 text-xs font-medium rounded transition-colors ${
-                    theme === "light"
-                      ? "bg-bullet-600 text-white"
-                      : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
-                  }`}
-                >
-                  {t("light")}
-                </button>
-              </div>
-            </Card>
-
-            {/* Language */}
-            <Card>
-              <h2 className="text-sm font-medium text-neutral-300 mb-3">
-                {t("language")}
-              </h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setLocale("pt-BR")}
-                  className={`flex-1 py-2 text-xs font-medium rounded transition-colors ${
-                    locale === "pt-BR"
-                      ? "bg-bullet-600 text-white"
-                      : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
-                  }`}
-                >
-                  Portugues
-                </button>
-                <button
-                  onClick={() => setLocale("en-US")}
-                  className={`flex-1 py-2 text-xs font-medium rounded transition-colors ${
-                    locale === "en-US"
-                      ? "bg-bullet-600 text-white"
-                      : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
-                  }`}
-                >
-                  English
-                </button>
-              </div>
-            </Card>
-
-            {/* Update check */}
-            <Card>
-              <h2 className="text-sm font-medium text-neutral-300 mb-3">
-                {t("update")}
-              </h2>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-neutral-400 flex-1">
-                  {updateInfo
-                    ? updateInfo.has_update
-                      ? `v${updateInfo.latest} ${t("available")}`
-                      : `v${updateInfo.current} (${t("current")})`
-                    : t("checkUpdates")}
-                </span>
-                <button
-                  onClick={doCheckUpdate}
-                  className="px-3 py-1.5 bg-neutral-800 text-neutral-300 text-xs rounded hover:bg-neutral-700 transition-colors flex items-center gap-1.5"
-                >
-                  <RefreshCw className="w-3 h-3" />
-                  {t("verify")}
-                </button>
-              </div>
-              {updateInfo?.has_update && updateInfo.url && (
-                <p className="mt-2 text-xs text-bullet-400">
-                  Download: {updateInfo.url}
-                </p>
-              )}
-            </Card>
-
-            {/* App info */}
-            <Card>
-              <h2 className="text-sm font-medium text-neutral-300 mb-3">
-                {t("about")}
-              </h2>
-              <div className="space-y-1 text-xs text-neutral-500">
-                <p>Bullet VPN v2.1.0</p>
-                <p>Tauri 2 + React 19 + Rust</p>
-                <p>WireGuard + OpenVPN + Split Tunnel + Auto-Provisioning</p>
-                <p className="pt-1 text-neutral-700">effront</p>
-              </div>
-            </Card>
-
-            <LogPanel logs={logs} onClear={() => setLogs([])} />
-          </>
-        )}
-      </main>
-
-      {/* Footer */}
-      <footer className="flex items-center justify-center px-4 py-2 bg-neutral-900 border-t border-neutral-800">
-        <span className="text-[10px] text-neutral-700">
-          Bullet VPN v2.1.0 -- effront
-        </span>
-      </footer>
-    </div>
+          {/* Footer */}
+          <footer className={`flex items-center justify-center px-4 py-2 border-t ${isDark ? "bg-neutral-900 border-neutral-800" : "bg-white border-neutral-200"}`}>
+            <span className={`text-[10px] ${isDark ? "text-neutral-700" : "text-neutral-400"}`}>Bullet VPN v2.1.0 -- effront</span>
+          </footer>
+        </div>
+      </I18nCtx.Provider>
+    </ThemeCtx.Provider>
   );
 }
 
 // ── Shared components ─────────────────────────────────────────────
 
-function Card({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="bg-neutral-900 rounded-lg border border-neutral-800 p-4">
-      {children}
-    </div>
-  );
-}
-
-function CardHeader({
-  title,
-  onClose,
-}: {
-  title: string;
-  onClose: () => void;
-}) {
+function CardHeader({ title, onClose }: { title: string; onClose: () => void }) {
+  const isDark = useContext(ThemeCtx);
   return (
     <div className="flex items-center justify-between mb-3">
-      <h2 className="text-sm font-medium text-neutral-300">{title}</h2>
-      <button
-        onClick={onClose}
-        className="p-1 rounded hover:bg-neutral-800 text-neutral-400"
-      >
-        <X className="w-4 h-4" />
-      </button>
+      <h2 className={`text-sm font-medium ${isDark ? "text-neutral-300" : "text-neutral-700"}`}>{title}</h2>
+      <button onClick={onClose} className={`p-1 rounded ${isDark ? "hover:bg-neutral-800 text-neutral-400" : "hover:bg-neutral-200 text-neutral-500"}`}><X className="w-4 h-4" /></button>
     </div>
   );
 }
 
-function Field({
-  label,
-  placeholder,
-  value,
-  onChange,
-  type = "text",
-}: {
-  label: string;
-  placeholder: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-}) {
+function Field({ label, placeholder, value, onChange, type = "text" }: { label: string; placeholder: string; value: string; onChange: (v: string) => void; type?: string }) {
+  const isDark = useContext(ThemeCtx);
   return (
     <div>
-      <label className="block text-xs text-neutral-500 mb-0.5">{label}</label>
-      <input
-        type={type}
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-1.5 text-sm text-neutral-200 placeholder-neutral-600 focus:outline-none focus:ring-1 focus:ring-bullet-500"
-      />
+      <label className={`block text-xs mb-0.5 ${isDark ? "text-neutral-500" : "text-neutral-500"}`}>{label}</label>
+      <input type={type} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} className={`w-full rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-bullet-500 ${isDark ? "bg-neutral-800 border border-neutral-700 text-neutral-200 placeholder-neutral-600" : "bg-neutral-100 border border-neutral-300 text-neutral-800 placeholder-neutral-400"}`} />
     </div>
   );
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
+  const isDark = useContext(ThemeCtx);
   return (
     <div>
-      <p className="text-[10px] text-neutral-500 uppercase tracking-wider">
-        {label}
-      </p>
-      <p className="text-sm text-neutral-200 font-mono truncate">{value}</p>
+      <p className={`text-[10px] uppercase tracking-wider ${isDark ? "text-neutral-500" : "text-neutral-500"}`}>{label}</p>
+      <p className={`text-sm font-mono truncate ${isDark ? "text-neutral-200" : "text-neutral-800"}`}>{value}</p>
     </div>
   );
 }
 
-function GreenBtn({
-  onClick,
-  children,
-}: {
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
+function GreenBtn({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
   return (
-    <button
-      onClick={onClick}
-      className="mt-3 w-full py-2 bg-bullet-600 hover:bg-bullet-700 text-white text-sm font-medium rounded-lg transition-colors"
-    >
-      {children}
-    </button>
+    <button onClick={onClick} className="mt-3 w-full py-2 bg-bullet-600 hover:bg-bullet-700 text-white text-sm font-medium rounded-lg transition-colors">{children}</button>
   );
 }
 
-function IconBtn({
-  onClick,
-  disabled,
-  title,
-  className = "",
-  children,
-}: {
-  onClick: () => void;
-  disabled?: boolean;
-  title: string;
-  className?: string;
-  children: React.ReactNode;
-}) {
+function IconBtn({ onClick, disabled, title, className = "", children }: { onClick: () => void; disabled?: boolean; title: string; className?: string; children: React.ReactNode }) {
+  const isDark = useContext(ThemeCtx);
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`p-1 rounded hover:bg-neutral-800 text-neutral-400 hover:text-bullet-400 transition-colors disabled:opacity-30 ${className}`}
-      title={title}
-    >
-      {children}
-    </button>
+    <button onClick={onClick} disabled={disabled} className={`p-1 rounded transition-colors disabled:opacity-30 ${isDark ? "hover:bg-neutral-800 text-neutral-400 hover:text-bullet-400" : "hover:bg-neutral-200 text-neutral-500 hover:text-bullet-600"} ${className}`} title={title}>{children}</button>
   );
 }
 
-function NavBtn({
-  active,
-  onClick,
-  title,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  title: string;
-  children: React.ReactNode;
-}) {
+function NavBtn({ active, onClick, title, children }: { active: boolean; onClick: () => void; title: string; children: React.ReactNode }) {
+  const isDark = useContext(ThemeCtx);
   return (
-    <button
-      onClick={onClick}
-      className={`p-1.5 rounded transition-colors ${
-        active
-          ? "bg-neutral-800 text-bullet-400"
-          : "text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800/50"
-      }`}
-      title={title}
-    >
-      {children}
-    </button>
+    <button onClick={onClick} className={`p-1.5 rounded transition-colors ${active ? (isDark ? "bg-neutral-800 text-bullet-400" : "bg-neutral-200 text-bullet-600") : (isDark ? "text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800/50" : "text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/50")}`} title={title}>{children}</button>
   );
 }
 
-function Toggle({
-  icon,
-  label,
-  sublabel,
-  active,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  sublabel: string;
-  active: boolean;
-  onClick: () => void;
-}) {
+function Toggle({ icon, label, sublabel, active, onClick }: { icon: React.ReactNode; label: string; sublabel: string; active: boolean; onClick: () => void }) {
+  const isDark = useContext(ThemeCtx);
   return (
-    <button
-      onClick={onClick}
-      className="w-full flex items-center gap-3 bg-neutral-800 rounded-lg px-3 py-2 hover:bg-neutral-750 transition-colors text-left"
-    >
-      <div
-        className={`${active ? "text-bullet-400" : "text-neutral-500"}`}
-      >
-        {icon}
-      </div>
+    <button onClick={onClick} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 transition-colors text-left ${isDark ? "bg-neutral-800 hover:bg-neutral-750" : "bg-neutral-100 hover:bg-neutral-200"}`}>
+      <div className={`${active ? "text-bullet-400" : isDark ? "text-neutral-500" : "text-neutral-400"}`}>{icon}</div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-neutral-200">{label}</p>
-        <p className="text-[10px] text-neutral-500 truncate">{sublabel}</p>
+        <p className={`text-sm ${isDark ? "text-neutral-200" : "text-neutral-800"}`}>{label}</p>
+        <p className={`text-[10px] truncate ${isDark ? "text-neutral-500" : "text-neutral-500"}`}>{sublabel}</p>
       </div>
-      <div
-        className={`w-8 h-4 rounded-full relative transition-colors ${
-          active ? "bg-bullet-600" : "bg-neutral-700"
-        }`}
-      >
-        <div
-          className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
-            active ? "translate-x-4" : "translate-x-0.5"
-          }`}
-        />
+      <div className={`w-8 h-4 rounded-full relative transition-colors ${active ? "bg-bullet-600" : isDark ? "bg-neutral-700" : "bg-neutral-300"}`}>
+        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${active ? "translate-x-4" : "translate-x-0.5"}`} />
       </div>
     </button>
   );
 }
 
-function LogPanel({
-  logs,
-  onClear,
-}: {
-  logs: string[];
-  onClear: () => void;
-}) {
+function LogPanel({ logs, onClear }: { logs: string[]; onClear: () => void }) {
+  const isDark = useContext(ThemeCtx);
+  const t = useContext(I18nCtx);
   return (
-    <div className="flex-1 bg-neutral-900 rounded-lg border border-neutral-800 overflow-hidden flex flex-col min-h-[100px]">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-800">
-        <span className="text-xs font-medium text-neutral-400">Logs</span>
-        <button
-          onClick={onClear}
-          className="text-xs text-neutral-500 hover:text-neutral-300"
-        >
-          Limpar
-        </button>
+    <div className={`flex-1 rounded-lg border overflow-hidden flex flex-col min-h-[100px] ${isDark ? "bg-neutral-900 border-neutral-800" : "bg-white border-neutral-200 shadow-sm"}`}>
+      <div className={`flex items-center justify-between px-3 py-2 border-b ${isDark ? "border-neutral-800" : "border-neutral-200"}`}>
+        <span className={`text-xs font-medium ${isDark ? "text-neutral-400" : "text-neutral-600"}`}>{t("logs")}</span>
+        <button onClick={onClear} className={`text-xs ${isDark ? "text-neutral-500 hover:text-neutral-300" : "text-neutral-400 hover:text-neutral-700"}`}>{t("clear")}</button>
       </div>
-      <div className="flex-1 overflow-y-auto p-3 font-mono text-[11px] leading-relaxed text-neutral-500 space-y-0.5">
-        {logs.length === 0 ? (
-          <p className="text-neutral-700">Nenhum log.</p>
-        ) : (
-          logs.map((log, i) => <div key={i}>{log}</div>)
-        )}
+      <div className={`flex-1 overflow-y-auto p-3 font-mono text-[11px] leading-relaxed space-y-0.5 ${isDark ? "text-neutral-500" : "text-neutral-600"}`}>
+        {logs.length === 0 ? (<p className={isDark ? "text-neutral-700" : "text-neutral-400"}>{t("noLogs")}</p>) : (logs.map((log, i) => <div key={i}>{log}</div>))}
       </div>
     </div>
   );
