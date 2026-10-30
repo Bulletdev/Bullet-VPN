@@ -6,7 +6,7 @@
 ██████╔╝╚██████╔╝███████╗███████╗███████╗   ██║
 ╚═════╝  ╚═════╝ ╚══════╝╚══════╝╚══════╝   ╚═╝
 
-      Self-hosted VPN Client — effront
+      Self-hosted VPN Client — powered by @effront
 ```
 
 <div align="center">
@@ -290,15 +290,15 @@ After install, all VPN operations run via `sudo` without prompts.
 +---------------------------------------------------------------------------+
 |  SECURITY MODEL                                                           |
 +---------------------------------------------------------------------------+
-|  Chaves: Curve25519 (WireGuard nativo)                                    |
-|  Protocolo: WireGuard (auditado) + OpenVPN (auditado)                     |
-|  DNS: Cloudflare (1.1.1.1), Quad9, Google, OpenDNS (configuravel)         |
-|  Kill Switch: iptables OUTPUT chain (REJECT, nao DROP)                    |
-|  DNS Protection: iptables nat DNAT (transparente, sem tocar resolv.conf)  |
-|  Logs: Apenas locais (~/.config/bullet-vpn/), nada enviado a servidores   |
-|  Configs: Permissoes 0600 em .conf e .ovpn                                |
-|  Conflitos: Auto-detect e teardown de interfaces WG conflitantes          |
-|  Privilege: sudoers NOPASSWD para comandos especificos, nao ALL           |
+|  Keys: Curve25519 (native WireGuard)                                      |
+|  Protocols: WireGuard (audited) + OpenVPN (audited)                       |
+|  DNS: Cloudflare (1.1.1.1), Quad9, Google, OpenDNS (configurable)         |
+|  Kill Switch: iptables OUTPUT chain (REJECT, not DROP)                    |
+|  DNS Protection: iptables NAT DNAT (transparent, no resolv.conf changes)  |
+|  Logs: Local only (~/.config/bullet-vpn/), no data sent to servers        |
+|  Configs: 0600 file permissions for .conf and .ovpn files                 |
+|  Conflicts: Automatic detection and teardown of conflicting WG interfaces |
+|  Privileges: sudoers NOPASSWD for specific commands only, never ALL       |
 +---------------------------------------------------------------------------+
 ```
 
@@ -386,9 +386,9 @@ npm run build            # production build to dist/
 |   3   |  Kill switch, DNS protection             |  DONE    |
 |   4   |  SSH tunnel manager                      |  DONE    |
 |   5   |  Permissions (sudoers), settings panel   |  DONE    |
-|   6   |  Split tunneling (cgroup routing)        |  --      |
-|   7   |  Auto-provisioning via SSH               |  --      |
-|   8   |  Auto-reconnect, persistent tunnels      |  --      |
+|   6   |  Split tunneling (cgroup routing)        |  DONE    |
+|   7   |  Auto-provisioning via SSH               |  DONE    |
+|   8   |  Auto-reconnect, connection guard        |  DONE    |
 |   9   |  Polish, packaging, Windows/macOS        |  --      |
 +=======+==========================================+==========+
 ```

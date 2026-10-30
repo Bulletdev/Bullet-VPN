@@ -450,6 +450,56 @@ fn format_bytes(bytes: u64) -> String {
     }
 }
 
+// ── Update check ──────────────────────────────────────────────────
+
+#[derive(serde::Serialize)]
+struct UpdateInfo {
+    current: String,
+    latest: String,
+    has_update: bool,
+    url: String,
+}
+
+#[tauri::command]
+fn check_update() -> Result<UpdateInfo, String> {
+    let current = env!("CARGO_PKG_VERSION").to_string();
+
+    let output = std::process::Command::new("curl")
+        .args([
+            "-sL",
+            "-H",
+            "Accept: application/vnd.github.v3+json",
+            "https://api.github.com/repos/Bulletdev/Bullet-VPN/releases/latest",
+        ])
+        .output()
+        .map_err(|e| format!("curl falhou: {}", e))?;
+
+    let body = String::from_utf8_lossy(&output.stdout);
+    let latest = body
+        .split("\"tag_name\"")
+        .nth(1)
+        .and_then(|s| s.split('"').nth(1))
+        .unwrap_or("")
+        .trim_start_matches('v')
+        .to_string();
+
+    let download_url = body
+        .split("\"html_url\"")
+        .nth(1)
+        .and_then(|s| s.split('"').nth(1))
+        .unwrap_or("https://github.com/Bulletdev/Bullet-VPN/releases")
+        .to_string();
+
+    let has_update = !latest.is_empty() && latest != current;
+
+    Ok(UpdateInfo {
+        current,
+        latest,
+        has_update,
+        url: download_url,
+    })
+}
+
 // ── Entry point ─────────────────────────────────────────────────────
 
 pub fn run() {
@@ -557,6 +607,7 @@ pub fn run() {
             enable_connection_guard,
             disable_connection_guard,
             connection_guard_status,
+            check_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

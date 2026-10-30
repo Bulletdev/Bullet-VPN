@@ -153,6 +153,22 @@ function App() {
 
   // Settings state
   const [permInstalled, setPermInstalled] = useState(false);
+  const [theme, setTheme] = useState<"dark" | "light">(
+    () => (localStorage.getItem("bullet-theme") as "dark" | "light") || "dark"
+  );
+  const [updateInfo, setUpdateInfo] = useState<{
+    current: string;
+    latest: string;
+    has_update: boolean;
+    url: string;
+  } | null>(null);
+
+  // ── Theme ───────────────────────────────────────────────────────
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("light", theme === "light");
+    try { localStorage.setItem("bullet-theme", theme); } catch {}
+  }, [theme]);
 
   // ── Helpers ─────────────────────────────────────────────────────
 
@@ -705,6 +721,25 @@ function App() {
       addLog("Permissoes removidas.");
     } catch (e) {
       addLog(`Erro: ${e}`);
+    }
+  };
+
+  const doCheckUpdate = async () => {
+    try {
+      const info = await invoke<{
+        current: string;
+        latest: string;
+        has_update: boolean;
+        url: string;
+      }>("check_update");
+      setUpdateInfo(info);
+      addLog(
+        info.has_update
+          ? `Atualizacao disponivel: v${info.latest}`
+          : `Versao atual (v${info.current}) e a mais recente.`
+      );
+    } catch (e) {
+      addLog(`Erro ao verificar atualizacao: ${e}`);
     }
   };
 
@@ -1444,6 +1479,63 @@ function App() {
               </div>
             </Card>
 
+            {/* Theme */}
+            <Card>
+              <h2 className="text-sm font-medium text-neutral-300 mb-3">
+                Tema
+              </h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setTheme("dark")}
+                  className={`flex-1 py-2 text-xs font-medium rounded transition-colors ${
+                    theme === "dark"
+                      ? "bg-bullet-600 text-white"
+                      : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
+                  }`}
+                >
+                  Escuro
+                </button>
+                <button
+                  onClick={() => setTheme("light")}
+                  className={`flex-1 py-2 text-xs font-medium rounded transition-colors ${
+                    theme === "light"
+                      ? "bg-bullet-600 text-white"
+                      : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
+                  }`}
+                >
+                  Claro
+                </button>
+              </div>
+            </Card>
+
+            {/* Update check */}
+            <Card>
+              <h2 className="text-sm font-medium text-neutral-300 mb-3">
+                Atualizacao
+              </h2>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-neutral-400 flex-1">
+                  {updateInfo
+                    ? updateInfo.has_update
+                      ? `v${updateInfo.latest} disponivel`
+                      : `v${updateInfo.current} (atual)`
+                    : "Verificar atualizacoes"}
+                </span>
+                <button
+                  onClick={doCheckUpdate}
+                  className="px-3 py-1.5 bg-neutral-800 text-neutral-300 text-xs rounded hover:bg-neutral-700 transition-colors flex items-center gap-1.5"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  Verificar
+                </button>
+              </div>
+              {updateInfo?.has_update && updateInfo.url && (
+                <p className="mt-2 text-xs text-bullet-400">
+                  Download: {updateInfo.url}
+                </p>
+              )}
+            </Card>
+
             {/* App info */}
             <Card>
               <h2 className="text-sm font-medium text-neutral-300 mb-3">
@@ -1452,7 +1544,7 @@ function App() {
               <div className="space-y-1 text-xs text-neutral-500">
                 <p>Bullet VPN v2.1.0</p>
                 <p>Tauri 2 + React 19 + Rust</p>
-                <p>WireGuard + OpenVPN</p>
+                <p>WireGuard + OpenVPN + Split Tunnel + Auto-Provisioning</p>
                 <p className="pt-1 text-neutral-700">effront</p>
               </div>
             </Card>
