@@ -1,3 +1,4 @@
+mod db;
 mod dns;
 mod killswitch;
 mod openvpn;
@@ -8,8 +9,10 @@ mod wireguard;
 
 use profiles::{Profile, ProfileStore, VpnType};
 use ssh::{SshTunnel, TunnelStore};
-use std::sync::Mutex;
-use tauri::State;
+use std::sync::{Arc, Mutex};
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::TrayIconBuilder;
+use tauri::{Manager, State};
 
 struct AppState {
     store: Mutex<ProfileStore>,
@@ -56,6 +59,46 @@ fn import_ovpn(state: State<AppState>, profile_id: String, content: String) -> R
         store.save().map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+// ── Key generation commands ─────────────────────────────────────────
+
+#[derive(serde::Serialize)]
+struct Keypair {
+    private_key: String,
+    public_key: String,
+}
+
+#[tauri::command]
+fn generate_keypair() -> Keypair {
+    use base64::Engine;
+    use x25519_dalek::{PublicKey, StaticSecret};
+
+    let secret = StaticSecret::random_from_rng(rand::rngs::OsRng);
+    let public = PublicKey::from(&secret);
+
+    let encoder = base64::engine::general_purpose::STANDARD;
+    Keypair {
+        private_key: encoder.encode(secret.to_bytes()),
+        public_key: encoder.encode(public.as_bytes()),
+    }
+}
+
+#[tauri::command]
+fn derive_public_key(private_key: String) -> Result<String, String> {
+    use base64::Engine;
+    use x25519_dalek::{PublicKey, StaticSecret};
+
+    let encoder = base64::engine::general_purpose::STANDARD;
+    let bytes: [u8; 32] = encoder
+        .decode(&private_key)
+        .map_err(|e| format!("Base64 invalido: {}", e))?
+        .try_into()
+        .map_err(|_| "Chave deve ter 32 bytes".to_string())?;
+
+    let secret = StaticSecret::from(bytes);
+    let public = PublicKey::from(&secret);
+    Ok(encoder.encode(public.as_bytes()))
 }
 
 // ── VPN commands ────────────────────────────────────────────────────
@@ -320,8 +363,9 @@ pub fn run() {
         let _ = dns::restore();
     }
 
-    let store = ProfileStore::load().unwrap_or_default();
-    let tunnel_store = TunnelStore::load();
+    let database = Arc::new(db::Database::open().expect("failed to open database"));
+    let store = ProfileStore::new(database.clone());
+    let tunnel_store = TunnelStore::new(database);
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -331,11 +375,55 @@ pub fn run() {
             active_interface: Mutex::new(None),
             active_ovpn: Mutex::new(None),
         })
+        .setup(|app| {
+            let label = MenuItem::with_id(app, "label", "Bullet VPN v2.1.0", false, None::<&str>)?;
+            let show = MenuItem::with_id(app, "show", "Mostrar", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Sair", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&label, &show, &quit])?;
+
+            TrayIconBuilder::new()
+                .menu(&menu)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "show" => {
+                        if let Some(w) = app.get_webview_window("main") {
+                            let _ = w.show();
+                            let _ = w.set_focus();
+                        }
+                    }
+                    "quit" => {
+                        app.exit(0);
+                    }
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let tauri::tray::TrayIconEvent::Click { .. } = event {
+                        if let Some(w) = tray.app_handle().get_webview_window("main") {
+                            let _ = w.show();
+                            let _ = w.set_focus();
+                        }
+                    }
+                })
+                .build(app)?;
+
+            if let Some(window) = app.get_webview_window("main") {
+                let w = window.clone();
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = w.hide();
+                    }
+                });
+            }
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             list_profiles,
             add_profile,
             remove_profile,
             import_ovpn,
+            generate_keypair,
+            derive_public_key,
             connect,
             disconnect,
             get_status,

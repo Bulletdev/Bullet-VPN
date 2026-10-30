@@ -13,6 +13,7 @@ import {
   Globe,
   Play,
   Square,
+  Key,
 } from "lucide-react";
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -664,6 +665,22 @@ function App() {
                     value={form.server_pubkey}
                     onChange={(v) => setForm({ ...form, server_pubkey: v })}
                   />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const kp = await invoke<{ private_key: string; public_key: string }>("generate_keypair");
+                        setForm({ ...form, private_key: kp.private_key, public_key: kp.public_key });
+                        addLog("Par de chaves X25519 gerado.");
+                      } catch (e) {
+                        addLog(`Erro ao gerar chaves: ${e}`);
+                      }
+                    }}
+                    className="w-full flex items-center justify-center gap-2 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-bullet-400 text-xs font-medium border border-neutral-700 rounded transition-colors"
+                  >
+                    <Key className="w-3.5 h-3.5" />
+                    Gerar Chaves X25519
+                  </button>
                   <Field
                     label="Private Key *"
                     placeholder="Sua chave privada WireGuard"
@@ -671,6 +688,16 @@ function App() {
                     onChange={(v) => setForm({ ...form, private_key: v })}
                     type="password"
                   />
+                  <div>
+                    <label className="block text-xs text-neutral-500 mb-0.5">Public Key (derivada)</label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={form.public_key}
+                      placeholder="Gerada automaticamente"
+                      className="w-full bg-neutral-800/50 border border-neutral-700 rounded px-3 py-1.5 text-sm text-neutral-400 font-mono cursor-default focus:outline-none"
+                    />
+                  </div>
                   <Field
                     label="Address"
                     placeholder="10.8.0.2/32"

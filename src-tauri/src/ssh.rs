@@ -1,7 +1,9 @@
+use crate::db::Database;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -25,17 +27,8 @@ pub struct SshTunnel {
     pub ssh_key: String,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct TunnelStore {
-    tunnels: Vec<SshTunnel>,
-}
-
-fn store_path() -> PathBuf {
-    let dir = dirs::config_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("bullet-vpn");
-    fs::create_dir_all(&dir).ok();
-    dir.join("ssh-tunnels.json")
+    db: Arc<Database>,
 }
 
 fn pid_dir() -> PathBuf {
@@ -48,37 +41,28 @@ fn pid_dir() -> PathBuf {
 }
 
 impl TunnelStore {
-    pub fn load() -> Self {
-        let path = store_path();
-        if !path.exists() {
-            return Self::default();
-        }
-        fs::read_to_string(&path)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default()
-    }
-
-    pub fn save(&self) -> Result<(), String> {
-        let data = serde_json::to_string_pretty(self).map_err(|e| e.to_string())?;
-        fs::write(store_path(), data).map_err(|e| e.to_string())
+    pub fn new(db: Arc<Database>) -> Self {
+        TunnelStore { db }
     }
 
     pub fn list(&self) -> Vec<SshTunnel> {
-        self.tunnels.clone()
-    }
-
-    pub fn add(&mut self, tunnel: SshTunnel) {
-        self.tunnels.retain(|t| t.id != tunnel.id);
-        self.tunnels.push(tunnel);
-    }
-
-    pub fn remove(&mut self, id: &str) {
-        self.tunnels.retain(|t| t.id != id);
+        self.db.list_ssh_tunnels()
     }
 
     pub fn get(&self, id: &str) -> Option<SshTunnel> {
-        self.tunnels.iter().find(|t| t.id == id).cloned()
+        self.db.get_ssh_tunnel(id)
+    }
+
+    pub fn add(&mut self, tunnel: SshTunnel) {
+        let _ = self.db.save_ssh_tunnel(&tunnel);
+    }
+
+    pub fn remove(&mut self, id: &str) {
+        let _ = self.db.remove_ssh_tunnel(id);
+    }
+
+    pub fn save(&self) -> Result<(), String> {
+        Ok(())
     }
 }
 

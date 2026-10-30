@@ -1,7 +1,6 @@
+use crate::db::Database;
 use serde::{Deserialize, Serialize};
-use std::fs;
-use std::io;
-use std::path::PathBuf;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -39,49 +38,32 @@ pub struct Profile {
     pub ovpn_config_path: String,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ProfileStore {
-    profiles: Vec<Profile>,
+    db: Arc<Database>,
 }
 
 impl ProfileStore {
-    fn config_path() -> PathBuf {
-        let dir = dirs::config_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("bullet-vpn");
-        fs::create_dir_all(&dir).ok();
-        dir.join("profiles.json")
-    }
-
-    pub fn load() -> Result<Self, io::Error> {
-        let path = Self::config_path();
-        if !path.exists() {
-            return Ok(Self::default());
-        }
-        let data = fs::read_to_string(&path)?;
-        serde_json::from_str(&data).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
-    }
-
-    pub fn save(&self) -> Result<(), io::Error> {
-        let path = Self::config_path();
-        let data = serde_json::to_string_pretty(self)?;
-        fs::write(&path, data)
+    pub fn new(db: Arc<Database>) -> Self {
+        ProfileStore { db }
     }
 
     pub fn list(&self) -> Vec<Profile> {
-        self.profiles.clone()
+        self.db.list_profiles()
     }
 
     pub fn get(&self, id: &str) -> Option<Profile> {
-        self.profiles.iter().find(|p| p.id == id).cloned()
+        self.db.get_profile(id)
     }
 
     pub fn add(&mut self, profile: Profile) {
-        self.profiles.retain(|p| p.id != profile.id);
-        self.profiles.push(profile);
+        let _ = self.db.save_profile(&profile);
     }
 
     pub fn remove(&mut self, id: &str) {
-        self.profiles.retain(|p| p.id != id);
+        let _ = self.db.remove_profile(id);
+    }
+
+    pub fn save(&self) -> Result<(), String> {
+        Ok(())
     }
 }
