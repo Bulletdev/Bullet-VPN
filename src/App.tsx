@@ -1594,32 +1594,31 @@ function App() {
             {/* Permissions */}
             <Card>
               <h2 className="text-sm font-medium text-neutral-300 mb-3">
-                Permissoes de Sistema
+                {t("systemPerms")}
               </h2>
               <p className="text-xs text-neutral-500 mb-3">
-                Instala regra sudoers para wg-quick, openvpn e iptables.
-                Elimina prompts de senha em todas as operacoes.
+                {t("permsDesc")}
               </p>
               <div className="flex items-center gap-2">
                 <div
                   className={`w-2 h-2 rounded-full ${permInstalled ? "bg-bullet-500" : "bg-neutral-600"}`}
                 />
                 <span className="text-xs text-neutral-400 flex-1">
-                  {permInstalled ? "Instalado" : "Nao instalado"}
+                  {permInstalled ? t("installed") : t("notInstalled")}
                 </span>
                 {permInstalled ? (
                   <button
                     onClick={uninstallPerms}
                     className="px-3 py-1.5 bg-red-600/20 text-red-400 text-xs rounded hover:bg-red-600/30 transition-colors"
                   >
-                    Remover
+                    {t("remove")}
                   </button>
                 ) : (
                   <button
                     onClick={installPerms}
                     className="px-3 py-1.5 bg-bullet-600 text-white text-xs rounded hover:bg-bullet-700 transition-colors"
                   >
-                    Instalar
+                    {t("install")}
                   </button>
                 )}
               </div>
@@ -1628,7 +1627,7 @@ function App() {
             {/* DNS config */}
             <Card>
               <h2 className="text-sm font-medium text-neutral-300 mb-3">
-                DNS Padrao
+                {t("defaultDns")}
               </h2>
               <div className="flex gap-2">
                 <input
@@ -1653,7 +1652,7 @@ function App() {
             {/* Theme */}
             <Card>
               <h2 className="text-sm font-medium text-neutral-300 mb-3">
-                Tema
+                {t("theme")}
               </h2>
               <div className="flex gap-2">
                 <button
@@ -1664,7 +1663,7 @@ function App() {
                       : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
                   }`}
                 >
-                  Escuro
+                  {t("dark")}
                 </button>
                 <button
                   onClick={() => setTheme("light")}
@@ -1674,7 +1673,7 @@ function App() {
                       : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
                   }`}
                 >
-                  Claro
+                  {t("light")}
                 </button>
               </div>
             </Card>
@@ -1711,22 +1710,22 @@ function App() {
             {/* Update check */}
             <Card>
               <h2 className="text-sm font-medium text-neutral-300 mb-3">
-                Atualizacao
+                {t("update")}
               </h2>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-neutral-400 flex-1">
                   {updateInfo
                     ? updateInfo.has_update
-                      ? `v${updateInfo.latest} disponivel`
-                      : `v${updateInfo.current} (atual)`
-                    : "Verificar atualizacoes"}
+                      ? `v${updateInfo.latest} ${t("available")}`
+                      : `v${updateInfo.current} (${t("current")})`
+                    : t("checkUpdates")}
                 </span>
                 <button
                   onClick={doCheckUpdate}
                   className="px-3 py-1.5 bg-neutral-800 text-neutral-300 text-xs rounded hover:bg-neutral-700 transition-colors flex items-center gap-1.5"
                 >
                   <RefreshCw className="w-3 h-3" />
-                  Verificar
+                  {t("verify")}
                 </button>
               </div>
               {updateInfo?.has_update && updateInfo.url && (
@@ -1739,7 +1738,7 @@ function App() {
             {/* App info */}
             <Card>
               <h2 className="text-sm font-medium text-neutral-300 mb-3">
-                Sobre
+                {t("about")}
               </h2>
               <div className="space-y-1 text-xs text-neutral-500">
                 <p>Bullet VPN v2.1.0</p>
