@@ -34,8 +34,9 @@ pub fn setup(iface: &str) -> Result<(), String> {
 
     let _ = run(p, &["modprobe", "xt_cgroup"]);
 
-    let (gw, dev) = detect_physical_route(iface)
-        .ok_or("Não foi possível detectar o gateway físico (não-VPN). Verifique sua conexão de rede.")?;
+    let (gw, dev) = detect_physical_route(iface).ok_or(
+        "Não foi possível detectar o gateway físico (não-VPN). Verifique sua conexão de rede.",
+    )?;
 
     run(p, &["mkdir", "-p", CGROUP_PATH])?;
 
