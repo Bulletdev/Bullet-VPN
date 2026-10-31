@@ -99,13 +99,37 @@ pub fn up(config_path: &Path) -> Result<(), String> {
         .map_err(|e| format!("Falha ao executar pkexec: {}", e))?;
 
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let stdout = String::from_utf8_lossy(&output.stdout);
+        let combined = format!(
+            "{} {}",
+            String::from_utf8_lossy(&output.stderr),
+            String::from_utf8_lossy(&output.stdout)
+        );
+        if combined.contains("File exists") || combined.contains("already exists") {
+            let iface = config_path
+                .file_stem()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+            let _ = Command::new(permissions::priv_cmd())
+                .args(["wg-quick", "down", &config_path.to_string_lossy()])
+                .output();
+            let _ = Command::new(permissions::priv_cmd())
+                .args(["ip", "link", "delete", "dev", &iface])
+                .output();
+            let retry = Command::new(permissions::priv_cmd())
+                .args(["wg-quick", "up", &config_path.to_string_lossy()])
+                .output()
+                .map_err(|e| format!("Falha ao executar pkexec: {}", e))?;
+            if !retry.status.success() {
+                let stderr = String::from_utf8_lossy(&retry.stderr);
+                return Err(format!("wg-quick up falhou após retry: {}", stderr.trim()));
+            }
+            return Ok(());
+        }
         return Err(format!(
-            "wg-quick up falhou (exit {}): {} {}",
+            "wg-quick up falhou (exit {}): {}",
             output.status.code().unwrap_or(-1),
-            stderr.trim(),
-            stdout.trim()
+            combined.trim()
         ));
     }
     Ok(())
