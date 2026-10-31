@@ -16,125 +16,107 @@ fn marker_path() -> PathBuf {
         .join(".split-tunnel-active")
 }
 
-fn run(priv_cmd: &str, args: &[&str]) -> Result<(), String> {
-    let output = Command::new(priv_cmd)
-        .args(args)
+fn run_script(script: &str) -> Result<(), String> {
+    let p = permissions::priv_cmd();
+    let output = Command::new(p)
+        .args(["sh", "-c", script])
         .output()
-        .map_err(|e| format!("{} falhou: {}", priv_cmd, e))?;
+        .map_err(|e| format!("{} falhou: {}", p, e))?;
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("{}: {}", args[0], stderr.trim()));
+    if output.status.success() {
+        return Ok(());
     }
-    Ok(())
+
+    if p == "sudo" {
+        let output = Command::new("pkexec")
+            .args(["sh", "-c", script])
+            .output()
+            .map_err(|e| format!("pkexec falhou: {}", e))?;
+        if output.status.success() {
+            return Ok(());
+        }
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("split tunnel: {}", stderr.trim()));
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    Err(format!("split tunnel: {}", stderr.trim()))
 }
 
 pub fn setup(iface: &str) -> Result<(), String> {
-    let p = permissions::priv_cmd();
-
-    let _ = run(p, &["modprobe", "xt_cgroup"]);
-
     let (gw, dev) = detect_physical_route(iface).ok_or(
         "Não foi possível detectar o gateway físico (não-VPN). Verifique sua conexão de rede.",
     )?;
 
-    run(p, &["mkdir", "-p", CGROUP_PATH])?;
-
-    let classid_path = format!("{}/net_cls.classid", CGROUP_PATH);
     let classid_str = CLASSID.to_string();
-    run(
-        p,
-        &[
-            "sh",
-            "-c",
-            &format!("echo {} > {}", classid_str, classid_path),
-        ],
-    )?;
 
-    let _ = run(p, &["iptables", "-t", "mangle", "-N", CHAIN]);
-    let _ = run(p, &["iptables", "-t", "mangle", "-F", CHAIN]);
-
-    run(
-        p,
-        &[
-            "iptables",
-            "-t",
-            "mangle",
-            "-A",
-            CHAIN,
-            "-m",
-            "cgroup",
-            "--cgroup",
-            &format!("{}", CLASSID),
-            "-j",
-            "MARK",
-            "--set-mark",
-            FWMARK,
-        ],
-    )?;
-
-    let _ = run(
-        p,
-        &["iptables", "-t", "mangle", "-D", "OUTPUT", "-j", CHAIN],
+    let script = format!(
+        "modprobe xt_cgroup 2>/dev/null; \
+         mkdir -p {cgroup} && \
+         echo {classid} > {cgroup}/net_cls.classid && \
+         iptables -t mangle -N {chain} 2>/dev/null; \
+         iptables -t mangle -F {chain} && \
+         iptables -t mangle -A {chain} -m cgroup --cgroup {classid} -j MARK --set-mark {fwmark} && \
+         iptables -t mangle -D OUTPUT -j {chain} 2>/dev/null; \
+         iptables -t mangle -A OUTPUT -j {chain} && \
+         ip rule del fwmark {fwmark} table {table} 2>/dev/null; \
+         ip rule add fwmark {fwmark} table {table} && \
+         ip route flush table {table}; \
+         ip route add default via {gw} dev {dev} table {table}",
+        cgroup = CGROUP_PATH,
+        classid = classid_str,
+        chain = CHAIN,
+        fwmark = FWMARK,
+        table = TABLE,
+        gw = gw,
+        dev = dev,
     );
-    run(
-        p,
-        &["iptables", "-t", "mangle", "-A", "OUTPUT", "-j", CHAIN],
-    )?;
 
-    let _ = run(p, &["ip", "rule", "del", "fwmark", FWMARK, "table", TABLE]);
-    run(p, &["ip", "rule", "add", "fwmark", FWMARK, "table", TABLE])?;
-
-    let _ = run(p, &["ip", "route", "flush", "table", TABLE]);
-
-    run(
-        p,
-        &[
-            "ip", "route", "add", "default", "via", &gw, "dev", &dev, "table", TABLE,
-        ],
-    )?;
+    run_script(&script)?;
 
     fs::write(marker_path(), iface).ok();
     Ok(())
 }
 
 pub fn teardown() -> Result<(), String> {
-    let p = permissions::priv_cmd();
-
-    let _ = run(
-        p,
-        &["iptables", "-t", "mangle", "-D", "OUTPUT", "-j", CHAIN],
-    );
-    let _ = run(p, &["iptables", "-t", "mangle", "-F", CHAIN]);
-    let _ = run(p, &["iptables", "-t", "mangle", "-X", CHAIN]);
-
-    let _ = run(p, &["ip", "rule", "del", "fwmark", FWMARK, "table", TABLE]);
-    let _ = run(p, &["ip", "route", "flush", "table", TABLE]);
-
-    let tasks = list_pids();
-    if !tasks.is_empty() {
-        let init_cgroup = "/sys/fs/cgroup/net_cls/tasks";
-        for pid in tasks {
-            let _ = run(p, &["sh", "-c", &format!("echo {} > {}", pid, init_cgroup)]);
-        }
+    let pids = list_pids();
+    let mut move_pids = String::new();
+    for pid in &pids {
+        move_pids.push_str(&format!(
+            "echo {} > /sys/fs/cgroup/net_cls/tasks 2>/dev/null; ",
+            pid
+        ));
     }
 
-    let _ = run(p, &["rmdir", CGROUP_PATH]);
+    let script = format!(
+        "iptables -t mangle -D OUTPUT -j {chain} 2>/dev/null; \
+         iptables -t mangle -F {chain} 2>/dev/null; \
+         iptables -t mangle -X {chain} 2>/dev/null; \
+         ip rule del fwmark {fwmark} table {table} 2>/dev/null; \
+         ip route flush table {table} 2>/dev/null; \
+         {move_pids}\
+         rmdir {cgroup} 2>/dev/null; \
+         true",
+        chain = CHAIN,
+        fwmark = FWMARK,
+        table = TABLE,
+        cgroup = CGROUP_PATH,
+        move_pids = move_pids,
+    );
+
+    run_script(&script)?;
 
     fs::remove_file(marker_path()).ok();
     Ok(())
 }
 
 pub fn add_pid(pid: u32) -> Result<(), String> {
-    let p = permissions::priv_cmd();
     let tasks_path = format!("{}/tasks", CGROUP_PATH);
-    run(p, &["sh", "-c", &format!("echo {} > {}", pid, tasks_path)])
+    run_script(&format!("echo {} > {}", pid, tasks_path))
 }
 
 pub fn remove_pid(pid: u32) -> Result<(), String> {
-    let p = permissions::priv_cmd();
-    let init_tasks = "/sys/fs/cgroup/net_cls/tasks";
-    run(p, &["sh", "-c", &format!("echo {} > {}", pid, init_tasks)])
+    run_script(&format!("echo {} > /sys/fs/cgroup/net_cls/tasks", pid))
 }
 
 pub fn list_pids() -> Vec<u32> {
