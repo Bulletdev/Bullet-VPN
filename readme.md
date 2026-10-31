@@ -14,7 +14,7 @@
 [![Rust](https://img.shields.io/badge/rust-1.98-DEA584?logo=rust)](https://www.rust-lang.org/)
 [![Tauri](https://img.shields.io/badge/tauri-2.x-FFC131?logo=tauri)](https://v2.tauri.app/)
 [![React](https://img.shields.io/badge/react-19-61DAFB?logo=react)](https://react.dev/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
 </div>
 
@@ -32,10 +32,10 @@
 
 ```
 +---------------------------------------------------------------------------+
-|  Sec: Chaves Curve25519 native  + iptables kill switch                    |
-|  Performance: WireGuard kernel-level for max specified                    |
+|  Sec: Keys Curve25519 native  + iptables kill switch                      |
+|  Performance: WireGuard kernel-level for max speed                        |
 |  Protocol:  WireGuard + OpenVPN (dual stack complete)                     |
-|  Beginner-friendly,: Clean Interface, 3 clicks to begin                   |
+|  Beginner-friendly,  Clean Interface, 3 clicks to begin                   |
 |  Zero Logs: No data saved or remotely sent                                |
 |  Privacy:   DNS protection via DNAT, kill switch via iptables             |
 |  Multiplataform:  Linux (ready), Windows e macOS (soon)                   |
@@ -293,7 +293,7 @@ Switch to the SSH tab. Add tunnel profiles:
 
 ### Permissions (no more password prompts)
 
-Go to Settings, click "Instalar". One-time password prompt to write:
+Go to Settings, click "Install". One-time password prompt to write:
 
 ```
 /etc/sudoers.d/bullet-vpn
@@ -409,7 +409,7 @@ npm run build            # production build to dist/
 |   6   |  Split tunneling (cgroup routing)        |  DONE    |
 |   7   |  Auto-provisioning via SSH               |  DONE    |
 |   8   |  Auto-reconnect, connection guard        |  DONE    |
-|   9   |  Theme, i18n, update check, packaging     |  DONE    |
+|   9   |  Theme, i18n, update check, packaging    |  DONE    |
 +=======+==========================================+==========+
 ```
 
