@@ -438,7 +438,6 @@ function App() {
   useEffect(() => {
     try { localStorage.setItem("bullet-theme", theme); } catch { /* ignore */ }
     document.documentElement.setAttribute("data-theme", theme);
-    document.documentElement.classList.toggle("light", theme === "light");
   }, [theme]);
 
   // VPN state
@@ -1036,9 +1035,9 @@ function App() {
     ? "bg-neutral-800 border border-neutral-700 text-neutral-200 placeholder-neutral-600"
     : "bg-neutral-100 border border-neutral-300 text-neutral-800 placeholder-neutral-400";
 
-  const headingCls = isDark ? "text-neutral-300" : "text-neutral-700";
-  const mutedCls = isDark ? "text-neutral-400" : "text-neutral-600";
-  const subtleCls = isDark ? "text-neutral-500" : "text-neutral-500";
+  const headingCls = isDark ? "text-neutral-300" : "text-neutral-900";
+  const mutedCls = isDark ? "text-neutral-400" : "text-neutral-700";
+  const subtleCls = isDark ? "text-neutral-500" : "text-neutral-600";
 
   // ── Render ──────────────────────────────────────────────────────
 
@@ -1366,7 +1365,7 @@ function App() {
                     <p>Bullet VPN v2.1.0</p>
                     <p>Tauri 2 + React 19 + Rust</p>
                     <p>WireGuard + OpenVPN + Split Tunnel + Auto-Provisioning</p>
-                    <p className={`pt-1 ${isDark ? "text-neutral-700" : "text-neutral-400"}`}>effront</p>
+                    <p className={`pt-1 ${isDark ? "text-neutral-700" : "text-neutral-500"}`}>effront</p>
                   </div>
                 </div>
                 <LogPanel logs={logs} onClear={() => setLogs([])} />
@@ -1376,7 +1375,7 @@ function App() {
 
           {/* Footer */}
           <footer className={`flex items-center justify-center px-4 py-2 border-t ${isDark ? "bg-neutral-900 border-neutral-800" : "bg-white border-neutral-200"}`}>
-            <span className={`text-[10px] ${isDark ? "text-neutral-700" : "text-neutral-400"}`}>Bullet VPN v2.1.0 -- effront</span>
+            <span className={`text-[10px] ${isDark ? "text-neutral-700" : "text-neutral-500"}`}>Bullet VPN v2.1.0 -- effront</span>
           </footer>
         </div>
       </I18nCtx.Provider>
@@ -1400,7 +1399,7 @@ function Field({ label, placeholder, value, onChange, type = "text" }: { label: 
   const isDark = useContext(ThemeCtx);
   return (
     <div>
-      <label className={`block text-xs mb-0.5 ${isDark ? "text-neutral-500" : "text-neutral-500"}`}>{label}</label>
+      <label className={`block text-xs mb-0.5 ${isDark ? "text-neutral-500" : "text-neutral-600"}`}>{label}</label>
       <input type={type} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} className={`w-full rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-bullet-500 ${isDark ? "bg-neutral-800 border border-neutral-700 text-neutral-200 placeholder-neutral-600" : "bg-neutral-100 border border-neutral-300 text-neutral-800 placeholder-neutral-400"}`} />
     </div>
   );
@@ -1410,7 +1409,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   const isDark = useContext(ThemeCtx);
   return (
     <div>
-      <p className={`text-[10px] uppercase tracking-wider ${isDark ? "text-neutral-500" : "text-neutral-500"}`}>{label}</p>
+      <p className={`text-[10px] uppercase tracking-wider ${isDark ? "text-neutral-500" : "text-neutral-600"}`}>{label}</p>
       <p className={`text-sm font-mono truncate ${isDark ? "text-neutral-200" : "text-neutral-800"}`}>{value}</p>
     </div>
   );
@@ -1425,14 +1424,14 @@ function GreenBtn({ onClick, children }: { onClick: () => void; children: React.
 function IconBtn({ onClick, disabled, title, className = "", children }: { onClick: () => void; disabled?: boolean; title: string; className?: string; children: React.ReactNode }) {
   const isDark = useContext(ThemeCtx);
   return (
-    <button onClick={onClick} disabled={disabled} className={`p-1 rounded transition-colors disabled:opacity-30 ${isDark ? "hover:bg-neutral-800 text-neutral-400 hover:text-bullet-400" : "hover:bg-neutral-200 text-neutral-500 hover:text-bullet-600"} ${className}`} title={title}>{children}</button>
+    <button onClick={onClick} disabled={disabled} className={`p-1 rounded transition-colors disabled:opacity-30 ${isDark ? "hover:bg-neutral-800 text-neutral-400 hover:text-bullet-400" : "hover:bg-neutral-200 text-neutral-700 hover:text-bullet-600"} ${className}`} title={title}>{children}</button>
   );
 }
 
 function NavBtn({ active, onClick, title, children }: { active: boolean; onClick: () => void; title: string; children: React.ReactNode }) {
   const isDark = useContext(ThemeCtx);
   return (
-    <button onClick={onClick} className={`p-1.5 rounded transition-colors ${active ? (isDark ? "bg-neutral-800 text-bullet-400" : "bg-neutral-200 text-bullet-600") : (isDark ? "text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800/50" : "text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/50")}`} title={title}>{children}</button>
+    <button onClick={onClick} className={`p-1.5 rounded transition-colors ${active ? (isDark ? "bg-neutral-800 text-bullet-400" : "bg-neutral-200 text-bullet-600") : (isDark ? "text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800/50" : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200/50")}`} title={title}>{children}</button>
   );
 }
 
@@ -1440,10 +1439,10 @@ function Toggle({ icon, label, sublabel, active, onClick }: { icon: React.ReactN
   const isDark = useContext(ThemeCtx);
   return (
     <button onClick={onClick} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 transition-colors text-left ${isDark ? "bg-neutral-800 hover:bg-neutral-750" : "bg-neutral-100 hover:bg-neutral-200"}`}>
-      <div className={`${active ? "text-bullet-400" : isDark ? "text-neutral-500" : "text-neutral-400"}`}>{icon}</div>
+      <div className={`${active ? "text-bullet-400" : isDark ? "text-neutral-500" : "text-neutral-600"}`}>{icon}</div>
       <div className="flex-1 min-w-0">
         <p className={`text-sm ${isDark ? "text-neutral-200" : "text-neutral-800"}`}>{label}</p>
-        <p className={`text-[10px] truncate ${isDark ? "text-neutral-500" : "text-neutral-500"}`}>{sublabel}</p>
+        <p className={`text-[10px] truncate ${isDark ? "text-neutral-500" : "text-neutral-600"}`}>{sublabel}</p>
       </div>
       <div className={`w-8 h-4 rounded-full relative transition-colors ${active ? "bg-bullet-600" : isDark ? "bg-neutral-700" : "bg-neutral-300"}`}>
         <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${active ? "translate-x-4" : "translate-x-0.5"}`} />
@@ -1459,10 +1458,10 @@ function LogPanel({ logs, onClear }: { logs: string[]; onClear: () => void }) {
     <div className={`flex-1 rounded-lg border overflow-hidden flex flex-col min-h-[100px] ${isDark ? "bg-neutral-900 border-neutral-800" : "bg-white border-neutral-200 shadow-sm"}`}>
       <div className={`flex items-center justify-between px-3 py-2 border-b ${isDark ? "border-neutral-800" : "border-neutral-200"}`}>
         <span className={`text-xs font-medium ${isDark ? "text-neutral-400" : "text-neutral-600"}`}>{t("logs")}</span>
-        <button onClick={onClear} className={`text-xs ${isDark ? "text-neutral-500 hover:text-neutral-300" : "text-neutral-400 hover:text-neutral-700"}`}>{t("clear")}</button>
+        <button onClick={onClear} className={`text-xs ${isDark ? "text-neutral-500 hover:text-neutral-300" : "text-neutral-600 hover:text-neutral-900"}`}>{t("clear")}</button>
       </div>
       <div className={`flex-1 overflow-y-auto p-3 font-mono text-[11px] leading-relaxed space-y-0.5 ${isDark ? "text-neutral-500" : "text-neutral-600"}`}>
-        {logs.length === 0 ? (<p className={isDark ? "text-neutral-700" : "text-neutral-400"}>{t("noLogs")}</p>) : (logs.map((log, i) => <div key={i}>{log}</div>))}
+        {logs.length === 0 ? (<p className={isDark ? "text-neutral-700" : "text-neutral-500"}>{t("noLogs")}</p>) : (logs.map((log, i) => <div key={i}>{log}</div>))}
       </div>
     </div>
   );
