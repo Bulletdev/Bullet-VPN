@@ -32,13 +32,13 @@
 
 ```
 +---------------------------------------------------------------------------+
-|  Seguranca: Chaves Curve25519 native  + iptables kill switch              |
+|  Sec: Chaves Curve25519 native  + iptables kill switch                    |
 |  Performance: WireGuard kernel-level for max specified                    |
-|  Protocolo: WireGuard + OpenVPN (dual stack complete)                     |
+|  Protocol:  WireGuard + OpenVPN (dual stack complete)                     |
 |  Beginner-friendly,: Clean Interface, 3 clicks to begin                   |
-|  Zero Logs: Nenhum dado e armazenado ou enviado remotamente               |
-|  Privacidade: DNS protection via DNAT, kill switch via iptables           |
-|  Multiplataforma: Linux (ready), Windows e macOS (soon)                   |
+|  Zero Logs: No data saved or remotely sent                                |
+|  Privacy:   DNS protection via DNAT, kill switch via iptables             |
+|  Multiplataform:  Linux (ready), Windows e macOS (soon)                   |
 |  SSH Tunnels: Port forwarding local/remote/SOCKS integrated               |
 +---------------------------------------------------------------------------+
 ```
