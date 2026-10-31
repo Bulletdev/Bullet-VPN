@@ -928,7 +928,11 @@ function App() {
     } else {
       if (!wgStatus) { addLog(t("logVpnFirstGuard")); return; }
       try {
-        await invoke("enable_connection_guard", { iface: wgStatus.interface_name });
+        await invoke("enable_connection_guard", {
+          iface: wgStatus.interface_name,
+          vpnType: wgStatus.vpn_type,
+          profileId: selectedProfile,
+        });
         setConnGuardOn(true);
         addLog(t("logConnGuardOn"));
       } catch (e) {

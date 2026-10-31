@@ -151,10 +151,6 @@ fn connect(state: State<AppState>, profile_id: String) -> Result<(), String> {
             let iface_name = format!("bvpn-{}", &profile.id[..8]);
             let config_path = wireguard::write_config(&iface_name, &profile)?;
             wireguard::up(&config_path)?;
-            connection_guard::start(
-                iface_name.clone(),
-                config_path.to_string_lossy().to_string(),
-            );
             let mut active = state.active_interface.lock().map_err(|e| e.to_string())?;
             *active = Some(iface_name);
         }
@@ -339,16 +335,28 @@ fn split_tunnel_list_pids() -> Vec<u32> {
 // ── Connection guard commands ──────────────────────────────────────
 
 #[tauri::command]
-fn enable_connection_guard(iface: String) -> Result<(), String> {
-    let config_path = dirs::config_dir()
-        .unwrap_or_default()
-        .join("bullet-vpn")
-        .join("interfaces")
-        .join(format!("{}.conf", iface));
-    if !config_path.exists() {
-        return Err(format!("Config not found for interface {}", iface));
+fn enable_connection_guard(
+    iface: String,
+    vpn_type: Option<String>,
+    profile_id: Option<String>,
+) -> Result<(), String> {
+    if vpn_type.as_deref() == Some("openvpn") {
+        let pid = profile_id.ok_or("profile_id necessário para OpenVPN guard")?;
+        connection_guard::start(connection_guard::VpnGuard::Openvpn { profile_id: pid });
+    } else {
+        let config_path = dirs::config_dir()
+            .unwrap_or_default()
+            .join("bullet-vpn")
+            .join("interfaces")
+            .join(format!("{}.conf", iface));
+        if !config_path.exists() {
+            return Err(format!("Config not found for interface {}", iface));
+        }
+        connection_guard::start(connection_guard::VpnGuard::Wireguard {
+            iface_name: iface,
+            config_path: config_path.to_string_lossy().to_string(),
+        });
     }
-    connection_guard::start(iface, config_path.to_string_lossy().to_string());
     Ok(())
 }
 

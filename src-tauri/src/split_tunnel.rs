@@ -150,6 +150,10 @@ pub fn is_active() -> bool {
     marker_path().exists()
 }
 
+fn is_vpn_device(dev: &str, vpn_iface: &str) -> bool {
+    dev == vpn_iface || dev.starts_with("bvpn-") || dev.starts_with("tun") || dev.starts_with("tap")
+}
+
 fn detect_physical_route(vpn_iface: &str) -> Option<(String, String)> {
     let output = Command::new("ip")
         .args(["route", "show", "default"])
@@ -167,7 +171,7 @@ fn detect_physical_route(vpn_iface: &str) -> Option<(String, String)> {
             .position(|&p| p == "dev")
             .and_then(|i| parts.get(i + 1).copied());
         if let Some(d) = dev {
-            if d == vpn_iface || d.starts_with("bvpn-") {
+            if is_vpn_device(d, vpn_iface) {
                 continue;
             }
             return Some((parts[2].to_string(), d.to_string()));
@@ -189,7 +193,7 @@ fn detect_physical_route(vpn_iface: &str) -> Option<(String, String)> {
             .position(|&p| p == "dev")
             .and_then(|i| parts.get(i + 1).copied());
         if let Some(d) = dev {
-            if d == vpn_iface || d.starts_with("bvpn-") {
+            if is_vpn_device(d, vpn_iface) {
                 continue;
             }
             return Some((parts[2].to_string(), d.to_string()));
