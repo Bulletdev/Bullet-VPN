@@ -522,8 +522,8 @@ async fn self_update(app: tauri::AppHandle) -> Result<String, String> {
         .await
         .map_err(|e| e.to_string())??;
 
-    let asset_url = find_asset_url(&body, ".AppImage")
-        .or_else(|| find_asset_url(&body, ".deb"))
+    let asset_url = find_asset_url(&body, ".deb")
+        .or_else(|| find_asset_url(&body, ".AppImage"))
         .ok_or("Nenhum asset compatível encontrado na release.")?;
 
     let ext = if asset_url.contains(".AppImage") {
@@ -539,7 +539,16 @@ async fn self_update(app: tauri::AppHandle) -> Result<String, String> {
     let dest_clone = dest.clone();
     let status = tauri::async_runtime::spawn_blocking(move || {
         std::process::Command::new("curl")
-            .args(["-sL", "-o", &dest_clone.to_string_lossy(), &asset_url])
+            .args([
+                "-fSL",
+                "--connect-timeout",
+                "15",
+                "--max-time",
+                "600",
+                "-o",
+                &dest_clone.to_string_lossy(),
+                &asset_url,
+            ])
             .status()
     })
     .await
@@ -549,11 +558,16 @@ async fn self_update(app: tauri::AppHandle) -> Result<String, String> {
         return Err("Falha no download do update.".into());
     }
 
+    let file_size = std::fs::metadata(&dest).map(|m| m.len()).unwrap_or(0);
+    if file_size < 1_000_000 {
+        return Err("Arquivo baixado é muito pequeno ou inválido.".into());
+    }
+
     emit("installing");
     if ext == ".deb" {
         let dest_clone = dest.clone();
         let out = tauri::async_runtime::spawn_blocking(move || {
-            std::process::Command::new(permissions::priv_cmd())
+            std::process::Command::new("pkexec")
                 .args(["dpkg", "-i", &dest_clone.to_string_lossy()])
                 .output()
         })
@@ -567,15 +581,26 @@ async fn self_update(app: tauri::AppHandle) -> Result<String, String> {
         emit("done");
         Ok("Atualizado via .deb. Reinicie o app.".into())
     } else {
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o755))
-                .map_err(|e| e.to_string())?;
+        let dest_clone = dest.clone();
+        let out = tauri::async_runtime::spawn_blocking(move || {
+            std::process::Command::new("pkexec")
+                .args([
+                    "cp",
+                    &dest_clone.to_string_lossy(),
+                    &std::env::current_exe()
+                        .unwrap()
+                        .to_string_lossy()
+                        .into_owned(),
+                ])
+                .output()
+        })
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| format!("Falha ao instalar AppImage: {}", e))?;
+        if !out.status.success() {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            return Err(format!("Instalação falhou: {}", stderr.trim()));
         }
-        let current_exe = std::env::current_exe().map_err(|e| format!("current_exe: {}", e))?;
-        std::fs::copy(&dest, &current_exe)
-            .map_err(|e| format!("Falha ao substituir binário: {}", e))?;
         emit("done");
         Ok("Atualizado via AppImage. Reinicie o app.".into())
     }

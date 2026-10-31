@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicedouble/tauri-apps/v2/tauri/tooling/cli/schema.json",
   "productName": "Bullet VPN",
-  "version": "2.3.3",
+  "version": "2.3.4",
   "identifier": "com.bulletvpn.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
