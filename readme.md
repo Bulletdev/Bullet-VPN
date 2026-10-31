@@ -64,17 +64,17 @@
 |  [x] Kill switch     -- iptables OUTPUT chain blocking non-tunnel         |
 |  [x] DNS protection  -- iptables DNAT forcing DNS through tunnel          |
 |  [x] Route control   -- granular AllowedIPs per profile                   |
-|  [ ] Split tunneling -- per-app routing via cgroup (Linux)                |
+|  [x] Split tunneling -- per-app routing via cgroup (Linux)                |
 |                                                                           |
 |  SSH TUNNELS                                                              |
 |  [x] Tunnel manager  -- local/remote/dynamic (SOCKS) port forwarding      |
 |  [x] Tunnel profiles -- save frequent tunnels (e.g. "DBeaver:15432")      |
-|  [ ] Auto-reconnect  -- persistent tunnels that survive network changes   |
+|  [x] Auto-reconnect  -- persistent tunnels that survive network changes   |
 |                                                                           |
 |  AUTO-PROVISIONING                                                        |
-|  [ ] SSH register    -- auto-register peer on remote server via SSH       |
-|  [ ] Server profiles -- associate SSH credentials to VPN profiles         |
-|  [ ] Firewall check  -- test UDP reachability before connecting           |
+|  [x] SSH register    -- auto-register peer on remote server via SSH       |
+|  [x] Server profiles -- associate SSH credentials to VPN profiles         |
+|  [x] Firewall check  -- test UDP reachability before connecting           |
 +---------------------------------------------------------------------------+
 ```
 
@@ -97,6 +97,22 @@
 |  09 - Ethical Use                                    |
 +------------------------------------------------------+
 ```
+
+---
+
+## Preview
+
+<div align="center">
+
+| Connected | Disconnected |
+|:---------:|:------------:|
+| <img src="public/preview1.png" width="300"/> | <img src="public/preview2.png" width="300"/> |
+
+| New Profile | Settings |
+|:-----------:|:--------:|
+| <img src="public/preview3.png" width="300"/> | <img src="public/preview4.png" width="300"/> |
+
+</div>
 
 ---
 
@@ -145,7 +161,7 @@ npx tauri build
 |  Privilege           |  sudoers (NOPASSWD) / pkexec fallback              |
 |  Firewall            |  iptables (kill switch + DNS DNAT)                 |
 |  SSH Tunnels         |  ssh -L/-R/-D (background, PID tracked)            |
-|  Persistence         |  JSON profiles in ~/.config/bullet-vpn/            |
+|  Persistence         |  SQLite + AES-256-GCM encrypted keys               |
 |  Icons               |  Custom SVG (effront shield)                       |
 |  Build               |  Vite 6 + Tauri bundler                            |
 +======================+====================================================+
@@ -212,7 +228,11 @@ Bullet-VPN/
       killswitch.rs           iptables OUTPUT chain (BULLET_VPN_KS)
       dns.rs                  iptables nat DNAT for DNS protection
       ssh.rs                  SSH tunnel manager (local/remote/dynamic)
+      db.rs                   SQLite persistence + AES-256-GCM encryption
       permissions.rs          sudoers install/uninstall for NOPASSWD
+      split_tunnel.rs         cgroup net_cls per-PID routing
+      connection_guard.rs     background monitor, auto-reconnect on drop
+      provisioning.rs         SSH-based WireGuard peer registration
       main.rs                 Entry point
     Cargo.toml
     tauri.conf.json
