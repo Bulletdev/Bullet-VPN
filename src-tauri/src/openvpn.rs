@@ -1,5 +1,6 @@
 use crate::permissions;
 use std::fs;
+use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -38,6 +39,8 @@ pub fn up(profile_id: &str) -> Result<(), String> {
 
     let pid = pid_path(profile_id);
 
+    let log_path = config_dir().join(format!("{}.log", profile_id));
+
     let output = Command::new(permissions::priv_cmd())
         .args([
             "openvpn",
@@ -46,10 +49,10 @@ pub fn up(profile_id: &str) -> Result<(), String> {
             "--daemon",
             "--writepid",
             &pid.to_string_lossy(),
-            "--log-append",
-            &config_dir()
-                .join(format!("{}.log", profile_id))
-                .to_string_lossy(),
+            "--log",
+            &log_path.to_string_lossy(),
+            "--verb",
+            "3",
         ])
         .output()
         .map_err(|e| format!("Falha ao executar pkexec: {}", e))?;
@@ -85,6 +88,8 @@ pub fn down(profile_id: &str) -> Result<(), String> {
 
     if output.status.success() {
         fs::remove_file(&pid_file).ok();
+        let log_file = config_dir().join(format!("{}.log", profile_id));
+        fs::remove_file(&log_file).ok();
     }
     Ok(())
 }
@@ -105,16 +110,21 @@ pub fn is_running(profile_id: &str) -> bool {
 
 pub fn read_log(profile_id: &str) -> String {
     let log = config_dir().join(format!("{}.log", profile_id));
-    match fs::read_to_string(&log) {
-        Ok(content) => {
-            let lines: Vec<&str> = content.lines().collect();
-            let start = if lines.len() > 20 {
-                lines.len() - 20
-            } else {
-                0
-            };
-            lines[start..].join("\n")
-        }
-        Err(_) => String::new(),
+    let mut file = match fs::File::open(&log) {
+        Ok(f) => f,
+        Err(_) => return String::new(),
+    };
+    let meta = match file.metadata() {
+        Ok(m) => m,
+        Err(_) => return String::new(),
+    };
+    const TAIL_BYTES: u64 = 8192;
+    if meta.len() > TAIL_BYTES {
+        file.seek(SeekFrom::End(-(TAIL_BYTES as i64))).ok();
     }
+    let mut buf = String::new();
+    file.read_to_string(&mut buf).ok();
+    let lines: Vec<&str> = buf.lines().collect();
+    let start = lines.len().saturating_sub(20);
+    lines[start..].join("\n")
 }
