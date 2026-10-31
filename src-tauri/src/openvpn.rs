@@ -4,6 +4,16 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
 use std::process::Command;
 
+const MAX_LOG_BYTES: u64 = 1_000_000;
+
+fn truncate_log(path: &PathBuf) {
+    if let Ok(meta) = fs::metadata(path) {
+        if meta.len() > MAX_LOG_BYTES {
+            fs::remove_file(path).ok();
+        }
+    }
+}
+
 fn config_dir() -> PathBuf {
     dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
@@ -40,6 +50,7 @@ pub fn up(profile_id: &str) -> Result<(), String> {
     let pid = pid_path(profile_id);
 
     let log_path = config_dir().join(format!("{}.log", profile_id));
+    truncate_log(&log_path);
 
     let output = Command::new(permissions::priv_cmd())
         .args([
@@ -52,7 +63,7 @@ pub fn up(profile_id: &str) -> Result<(), String> {
             "--log",
             &log_path.to_string_lossy(),
             "--verb",
-            "3",
+            "1",
         ])
         .output()
         .map_err(|e| format!("Falha ao executar pkexec: {}", e))?;

@@ -73,6 +73,11 @@ pub fn start(guard: VpnGuard) {
                             .join("bullet-vpn")
                             .join("openvpn")
                             .join(format!("{}.log", profile_id));
+                        if let Ok(m) = std::fs::metadata(&log) {
+                            if m.len() > 1_000_000 {
+                                let _ = std::fs::remove_file(&log);
+                            }
+                        }
                         let _ = Command::new(permissions::priv_cmd())
                             .args([
                                 "openvpn",
@@ -84,7 +89,7 @@ pub fn start(guard: VpnGuard) {
                                 "--log",
                                 &log.to_string_lossy(),
                                 "--verb",
-                                "3",
+                                "1",
                             ])
                             .output();
                     }
