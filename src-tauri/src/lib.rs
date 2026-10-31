@@ -15,7 +15,7 @@ use ssh::{SshTunnel, TunnelStore};
 use std::sync::{Arc, Mutex};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{Manager, State};
+use tauri::{Emitter, Manager, State};
 
 struct AppState {
     store: Mutex<ProfileStore>,
@@ -512,8 +512,15 @@ fn check_update() -> Result<UpdateInfo, String> {
 }
 
 #[tauri::command]
-fn self_update() -> Result<String, String> {
-    let body = fetch_release_json()?;
+async fn self_update(app: tauri::AppHandle) -> Result<String, String> {
+    let emit = |step: &str| {
+        let _ = app.emit("update-progress", step);
+    };
+
+    emit("fetching");
+    let body = tauri::async_runtime::spawn_blocking(fetch_release_json)
+        .await
+        .map_err(|e| e.to_string())??;
 
     let asset_url = find_asset_url(&body, ".AppImage")
         .or_else(|| find_asset_url(&body, ".deb"))
@@ -528,23 +535,36 @@ fn self_update() -> Result<String, String> {
     std::fs::create_dir_all(&tmp_dir).map_err(|e| e.to_string())?;
     let dest = tmp_dir.join(format!("bullet-vpn-latest{}", ext));
 
-    let status = std::process::Command::new("curl")
-        .args(["-sL", "-o", &dest.to_string_lossy(), &asset_url])
-        .status()
-        .map_err(|e| format!("download falhou: {}", e))?;
+    emit("downloading");
+    let dest_clone = dest.clone();
+    let status = tauri::async_runtime::spawn_blocking(move || {
+        std::process::Command::new("curl")
+            .args(["-sL", "-o", &dest_clone.to_string_lossy(), &asset_url])
+            .status()
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| format!("download falhou: {}", e))?;
     if !status.success() {
         return Err("Falha no download do update.".into());
     }
 
+    emit("installing");
     if ext == ".deb" {
-        let out = std::process::Command::new(permissions::priv_cmd())
-            .args(["dpkg", "-i", &dest.to_string_lossy()])
-            .output()
-            .map_err(|e| format!("dpkg falhou: {}", e))?;
+        let dest_clone = dest.clone();
+        let out = tauri::async_runtime::spawn_blocking(move || {
+            std::process::Command::new(permissions::priv_cmd())
+                .args(["dpkg", "-i", &dest_clone.to_string_lossy()])
+                .output()
+        })
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| format!("dpkg falhou: {}", e))?;
         if !out.status.success() {
             let stderr = String::from_utf8_lossy(&out.stderr);
             return Err(format!("Instalação falhou: {}", stderr.trim()));
         }
+        emit("done");
         Ok("Atualizado via .deb. Reinicie o app.".into())
     } else {
         #[cfg(unix)]
@@ -556,6 +576,7 @@ fn self_update() -> Result<String, String> {
         let current_exe = std::env::current_exe().map_err(|e| format!("current_exe: {}", e))?;
         std::fs::copy(&dest, &current_exe)
             .map_err(|e| format!("Falha ao substituir binário: {}", e))?;
+        emit("done");
         Ok("Atualizado via AppImage. Reinicie o app.".into())
     }
 }

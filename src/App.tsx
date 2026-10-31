@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, createContext, useContext } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import {
   RefreshCw,
   Plus,
@@ -218,6 +219,10 @@ const translations: Record<Locale, Record<string, string>> = {
     logUpdateError: "Erro ao verificar atualizacao: {error}",
     updateNow: "Atualizar",
     updating: "Atualizando...",
+    updateFetching: "Buscando release...",
+    updateDownloading: "Baixando...",
+    updateInstalling: "Instalando (senha admin)...",
+    updateDone: "Atualizado! Reinicie o app.",
     logUpdateSuccess: "Atualizado com sucesso! Reinicie o app.",
     logUpdateFailed: "Falha na atualizacao: {error}",
   },
@@ -365,6 +370,10 @@ const translations: Record<Locale, Record<string, string>> = {
     logUpdateError: "Error checking update: {error}",
     updateNow: "Update",
     updating: "Updating...",
+    updateFetching: "Fetching release...",
+    updateDownloading: "Downloading...",
+    updateInstalling: "Installing (admin password)...",
+    updateDone: "Updated! Restart the app.",
     logUpdateSuccess: "Updated successfully! Restart the app.",
     logUpdateFailed: "Update failed: {error}",
   },
@@ -499,6 +508,7 @@ function App() {
     url: string;
   } | null>(null);
   const [updating, setUpdating] = useState(false);
+  const [updateStep, setUpdateStep] = useState("");
 
   // ── Helpers ─────────────────────────────────────────────────────
 
@@ -573,6 +583,13 @@ function App() {
     const interval = setInterval(checkStatus, 2000);
     return () => clearInterval(interval);
   }, [checkStatus]);
+
+  useEffect(() => {
+    const unlisten = listen<string>("update-progress", (e) => {
+      setUpdateStep(e.payload);
+    });
+    return () => { unlisten.then((f) => f()); };
+  }, []);
 
   // ── VPN handlers ────────────────────────────────────────────────
 
@@ -1028,13 +1045,14 @@ function App() {
 
   const doSelfUpdate = async () => {
     setUpdating(true);
+    setUpdateStep("fetching");
     try {
       await invoke<string>("self_update");
       addLog(t("logUpdateSuccess"));
-      setUpdateInfo(null);
+      setUpdateStep("done");
     } catch (e) {
       addLog(t("logUpdateFailed", { error: String(e) }));
-    } finally {
+      setUpdateStep("");
       setUpdating(false);
     }
   };
@@ -1390,12 +1408,29 @@ function App() {
                       <RefreshCw className="w-3 h-3" />{t("verify")}
                     </button>
                   </div>
-                  {updateInfo?.has_update && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <button onClick={doSelfUpdate} disabled={updating} className={`px-3 py-1.5 text-xs rounded font-medium transition-colors flex items-center gap-1.5 ${updating ? "opacity-50 cursor-not-allowed" : ""} bg-bullet-600 text-white hover:bg-bullet-700`}>
-                        <Download className="w-3 h-3" />{updating ? t("updating") : t("updateNow")}
-                      </button>
-                      {updateInfo.url && <a href={updateInfo.url} target="_blank" rel="noopener noreferrer" className="text-xs text-bullet-400 hover:text-bullet-300 underline">GitHub</a>}
+                  {(updateInfo?.has_update || updateStep === "done") && (
+                    <div className="mt-2 space-y-2">
+                      {updating && updateStep && updateStep !== "done" && (
+                        <div className="flex items-center gap-2">
+                          <RefreshCw className="w-3 h-3 animate-spin text-bullet-400" />
+                          <span className="text-xs text-bullet-400">
+                            {updateStep === "fetching" ? t("updateFetching") : updateStep === "downloading" ? t("updateDownloading") : updateStep === "installing" ? t("updateInstalling") : t("updating")}
+                          </span>
+                        </div>
+                      )}
+                      {updateStep === "done" && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-green-400 font-medium">{t("updateDone")}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        {updateStep !== "done" && (
+                          <button onClick={doSelfUpdate} disabled={updating} className={`px-3 py-1.5 text-xs rounded font-medium transition-colors flex items-center gap-1.5 ${updating ? "opacity-50 cursor-not-allowed" : ""} bg-bullet-600 text-white hover:bg-bullet-700`}>
+                            <Download className="w-3 h-3" />{t("updateNow")}
+                          </button>
+                        )}
+                        {updateInfo?.url && <a href={updateInfo.url} target="_blank" rel="noopener noreferrer" className="text-xs text-bullet-400 hover:text-bullet-300 underline">GitHub</a>}
+                      </div>
                     </div>
                   )}
                 </div>
