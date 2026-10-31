@@ -6,8 +6,10 @@
 ██████╔╝╚██████╔╝███████╗███████╗███████╗   ██║
 ╚═════╝  ╚═════╝ ╚══════╝╚══════╝╚══════╝   ╚═╝
 
-      Self-hosted VPN Client — powered by @effront
+      Self-hosted VPN Client
 ```
+
+**powered by [@effront](https://github.com/effront)**
 
 <div align="center">
 
@@ -442,8 +444,6 @@ MIT License -- see [LICENSE](LICENSE) for details.
 
 <div align="center">
 
-```
-Built by effront
-```
+Built by [@effront](https://github.com/effront)
 
 </div>
