@@ -174,6 +174,8 @@ const translations: Record<Locale, Record<string, string>> = {
     logOvpnImported: "Perfil OpenVPN importado: {endpoint}",
     logImportOvpnError: "Erro ao importar OpenVPN: {error}",
     logImportError: "Erro ao importar: {error}",
+    confirmRemoveProfile: "Tem certeza que deseja remover o perfil \"{name}\"? As chaves e configurações serão perdidas.",
+    confirmRemoveTunnel: "Tem certeza que deseja remover o túnel \"{name}\"?",
     logProfileRemoved: "Perfil \"{name}\" removido.",
     logRemoveError: "Erro ao remover: {error}",
     logKillswitchOff: "Kill switch desativado.",
@@ -315,6 +317,8 @@ const translations: Record<Locale, Record<string, string>> = {
     logOvpnImported: "OpenVPN profile imported: {endpoint}",
     logImportOvpnError: "Error importing OpenVPN: {error}",
     logImportError: "Error importing: {error}",
+    confirmRemoveProfile: "Are you sure you want to remove the profile \"{name}\"? Keys and configuration will be lost.",
+    confirmRemoveTunnel: "Are you sure you want to remove the tunnel \"{name}\"?",
     logProfileRemoved: "Profile \"{name}\" removed.",
     logRemoveError: "Error removing: {error}",
     logKillswitchOff: "Kill switch disabled.",
@@ -750,10 +754,11 @@ function App() {
 
   const removeProfile = async () => {
     if (!selectedProfile) return;
-    const pName = profiles.find((p) => p.id === selectedProfile)?.name;
+    const pName = profiles.find((p) => p.id === selectedProfile)?.name || "";
+    if (!window.confirm(t("confirmRemoveProfile", { name: pName }))) return;
     try {
       await invoke("remove_profile", { profileId: selectedProfile });
-      addLog(t("logProfileRemoved", { name: pName || "" }));
+      addLog(t("logProfileRemoved", { name: pName }));
       setSelectedProfile(null);
       await loadProfiles();
     } catch (e) {
@@ -942,6 +947,8 @@ function App() {
   };
 
   const removeSshTunnel = async (id: string) => {
+    const tName = sshTunnels.find((t) => t.id === id)?.name || "";
+    if (!window.confirm(t("confirmRemoveTunnel", { name: tName }))) return;
     try {
       await invoke("remove_ssh_tunnel", { tunnelId: id });
       addLog(t("logTunnelRemoved"));
