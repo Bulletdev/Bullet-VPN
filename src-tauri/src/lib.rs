@@ -587,10 +587,7 @@ async fn self_update(app: tauri::AppHandle) -> Result<String, String> {
                 .args([
                     "cp",
                     &dest_clone.to_string_lossy(),
-                    &std::env::current_exe()
-                        .unwrap()
-                        .to_string_lossy()
-                        .into_owned(),
+                    &std::env::current_exe().unwrap().to_string_lossy(),
                 ])
                 .output()
         })

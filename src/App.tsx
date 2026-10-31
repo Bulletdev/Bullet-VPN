@@ -1441,7 +1441,7 @@ function App() {
                     <p>Bullet VPN v{updateInfo?.current || "2.3.4"}</p>
                     <p>Tauri 2 + React 19 + Rust</p>
                     <p>WireGuard + OpenVPN + Split Tunnel + Auto-Provisioning</p>
-                    <p className="pt-1"><a href="https://effront.gg/en" target="_blank" rel="noopener noreferrer" className="text-bullet-500 hover:text-bullet-400 transition-colors">effront</a></p>
+                    <p className="pt-1">powered by <a href="https://effront.gg/en" target="_blank" rel="noopener noreferrer" className="text-bullet-500 hover:text-bullet-400 transition-colors">effront</a></p>
                   </div>
                 </div>
                 <LogPanel logs={logs} onClear={() => setLogs([])} />
