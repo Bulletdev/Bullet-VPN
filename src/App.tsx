@@ -114,6 +114,8 @@ const translations: Record<Locale, Record<string, string>> = {
     splitTunnelSub: "Exclui processos do tunnel VPN",
     pidPlaceholder: "PID do processo",
     exclude: "Excluir",
+    selectProcess: "Selecionar processo",
+    loadingProcesses: "Carregando...",
     connGuard: "Connection Guard",
     connGuardSub: "Reconexao automatica se cair",
     type: "Tipo",
@@ -265,6 +267,8 @@ const translations: Record<Locale, Record<string, string>> = {
     splitTunnelSub: "Exclude processes from VPN tunnel",
     pidPlaceholder: "Process PID",
     exclude: "Exclude",
+    selectProcess: "Select process",
+    loadingProcesses: "Loading...",
     connGuard: "Connection Guard",
     connGuardSub: "Auto-reconnect on drop",
     type: "Type",
@@ -482,6 +486,8 @@ function App() {
   const [splitTunOn, setSplitTunOn] = useState(false);
   const [splitPids, setSplitPids] = useState<number[]>([]);
   const [splitPidInput, setSplitPidInput] = useState("");
+  const [processList, setProcessList] = useState<{pid: number; name: string}[]>([]);
+  const [processListOpen, setProcessListOpen] = useState(false);
   const [connGuardOn, setConnGuardOn] = useState(false);
 
   // Provisioning state
@@ -858,6 +864,22 @@ function App() {
         addLog(t("logError", { error: String(e) }));
       }
     }
+  };
+
+  const loadProcesses = async () => {
+    if (processListOpen) { setProcessListOpen(false); return; }
+    try {
+      const procs = await invoke<{pid: number; name: string}[]>("list_processes");
+      setProcessList(procs);
+      setProcessListOpen(true);
+    } catch (e) {
+      addLog(t("logError", { error: String(e) }));
+    }
+  };
+
+  const selectProcess = (pid: number) => {
+    setSplitPidInput(String(pid));
+    setProcessListOpen(false);
   };
 
   const addSplitPid = async () => {
@@ -1245,8 +1267,23 @@ function App() {
                         <div className="ml-6 space-y-2">
                           <div className="flex gap-1">
                             <input type="text" value={splitPidInput} onChange={(e) => setSplitPidInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addSplitPid()} placeholder={t("pidPlaceholder")} className={`flex-1 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-bullet-500 ${isDark ? "bg-neutral-800 border border-neutral-700 text-neutral-300" : "bg-neutral-100 border border-neutral-300 text-neutral-700"}`} />
+                            <button onClick={loadProcesses} className={`px-2 py-1 text-xs rounded transition-colors ${isDark ? "bg-neutral-700 text-neutral-300 hover:bg-neutral-600" : "bg-neutral-200 text-neutral-700 hover:bg-neutral-300"}`}>{t("selectProcess")}</button>
                             <button onClick={addSplitPid} className="px-2 py-1 bg-bullet-600 text-white text-xs rounded hover:bg-bullet-700 transition-colors">{t("exclude")}</button>
                           </div>
+                          {processListOpen && (
+                            <div className={`max-h-40 overflow-y-auto rounded border ${isDark ? "bg-neutral-800 border-neutral-700" : "bg-white border-neutral-300"}`}>
+                              {processList.length === 0 ? (
+                                <p className={`text-xs p-2 ${mutedCls}`}>{t("loadingProcesses")}</p>
+                              ) : (
+                                processList.map((proc) => (
+                                  <button key={proc.pid} onClick={() => selectProcess(proc.pid)} className={`w-full text-left px-2 py-1 text-xs flex justify-between items-center transition-colors ${isDark ? "hover:bg-neutral-700 text-neutral-300" : "hover:bg-neutral-100 text-neutral-700"}`}>
+                                    <span className="truncate">{proc.name}</span>
+                                    <span className={`font-mono ml-2 shrink-0 ${mutedCls}`}>{proc.pid}</span>
+                                  </button>
+                                ))
+                              )}
+                            </div>
+                          )}
                           {splitPids.length > 0 && (
                             <div className="space-y-1">
                               {splitPids.map((pid) => (
@@ -1438,7 +1475,7 @@ function App() {
                 <div className={cardCls}>
                   <h2 className={`text-sm font-medium ${headingCls} mb-3`}>{t("about")}</h2>
                   <div className={`space-y-1 text-xs ${subtleCls}`}>
-                    <p>Bullet VPN v{updateInfo?.current || "2.3.7"}</p>
+                    <p>Bullet VPN v{updateInfo?.current || "2.3.8"}</p>
                     <p>Tauri 2 + React 19 + Rust</p>
                     <p>WireGuard + OpenVPN + Split Tunnel + Auto-Provisioning</p>
                     <p className="pt-1">powered by <a href="https://effront.gg/en" target="_blank" rel="noopener noreferrer" className="text-bullet-500 hover:text-bullet-400 transition-colors">effront</a></p>
@@ -1451,7 +1488,7 @@ function App() {
 
           {/* Footer */}
           <footer className={`flex items-center justify-center px-4 py-2 border-t ${isDark ? "bg-neutral-900 border-neutral-800" : "bg-white border-neutral-200"}`}>
-            <span className={`text-[10px] ${isDark ? "text-neutral-700" : "text-neutral-500"}`}>Bullet VPN v{updateInfo?.current || "2.3.7"} -- <a href="https://effront.gg/en" target="_blank" rel="noopener noreferrer" className="hover:text-bullet-400 transition-colors">effront</a></span>
+            <span className={`text-[10px] ${isDark ? "text-neutral-700" : "text-neutral-500"}`}>Bullet VPN v{updateInfo?.current || "2.3.8"} -- <a href="https://effront.gg/en" target="_blank" rel="noopener noreferrer" className="hover:text-bullet-400 transition-colors">effront</a></span>
           </footer>
         </div>
       </I18nCtx.Provider>

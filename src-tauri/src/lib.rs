@@ -305,6 +305,41 @@ fn check_dns_leak() -> Result<Vec<String>, String> {
     dns::check_leak()
 }
 
+// ── Process list for split tunnel ──────────────────────────────────
+
+#[derive(serde::Serialize)]
+struct ProcessInfo {
+    pid: u32,
+    name: String,
+}
+
+#[tauri::command]
+fn list_processes() -> Vec<ProcessInfo> {
+    let mut procs = Vec::new();
+    let Ok(entries) = std::fs::read_dir("/proc") else {
+        return procs;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let Some(pid) = name.to_str().and_then(|s| s.parse::<u32>().ok()) else {
+            continue;
+        };
+        if pid == std::process::id() {
+            continue;
+        }
+        let comm_path = entry.path().join("comm");
+        if let Ok(comm) = std::fs::read_to_string(&comm_path) {
+            let comm = comm.trim().to_string();
+            if !comm.is_empty() {
+                procs.push(ProcessInfo { pid, name: comm });
+            }
+        }
+    }
+    procs.sort_by_key(|a| a.name.to_lowercase());
+    procs.dedup_by(|a, b| a.name == b.name);
+    procs
+}
+
 // ── Split tunnel commands ──────────────────────────────────────────
 
 #[tauri::command]
@@ -715,6 +750,7 @@ pub fn run() {
             split_tunnel_add_pid,
             split_tunnel_remove_pid,
             split_tunnel_list_pids,
+            list_processes,
             list_ssh_keys,
             register_peer,
             check_connectivity,

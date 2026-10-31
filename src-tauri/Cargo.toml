@@ -1,6 +1,6 @@
 [package]
 name = "bullet-vpn"
-version = "2.3.7"
+version = "2.3.8"
 description = "Bullet VPN - Self-hosted VPN client"
 authors = ["Michael Douglas"]
 edition = "2021"
