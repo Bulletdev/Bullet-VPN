@@ -62,7 +62,8 @@ pub fn setup(iface: &str) -> Result<(), String> {
          ip rule del fwmark {fwmark} table {table} 2>/dev/null; \
          ip rule add fwmark {fwmark} table {table} && \
          ip route flush table {table}; \
-         ip route add default via {gw} dev {dev} table {table}",
+         ip route add default via {gw} dev {dev} table {table} && \
+         chmod 666 {cgroup}/tasks /sys/fs/cgroup/net_cls/tasks",
         cgroup = CGROUP_PATH,
         classid = classid_str,
         chain = CHAIN,
@@ -112,11 +113,12 @@ pub fn teardown() -> Result<(), String> {
 
 pub fn add_pid(pid: u32) -> Result<(), String> {
     let tasks_path = format!("{}/tasks", CGROUP_PATH);
-    run_script(&format!("echo {} > {}", pid, tasks_path))
+    fs::write(&tasks_path, pid.to_string()).map_err(|e| format!("add_pid: {}", e))
 }
 
 pub fn remove_pid(pid: u32) -> Result<(), String> {
-    run_script(&format!("echo {} > /sys/fs/cgroup/net_cls/tasks", pid))
+    fs::write("/sys/fs/cgroup/net_cls/tasks", pid.to_string())
+        .map_err(|e| format!("remove_pid: {}", e))
 }
 
 pub fn list_pids() -> Vec<u32> {

@@ -1438,7 +1438,7 @@ function App() {
                 <div className={cardCls}>
                   <h2 className={`text-sm font-medium ${headingCls} mb-3`}>{t("about")}</h2>
                   <div className={`space-y-1 text-xs ${subtleCls}`}>
-                    <p>Bullet VPN v{updateInfo?.current || "2.3.5"}</p>
+                    <p>Bullet VPN v{updateInfo?.current || "2.3.6"}</p>
                     <p>Tauri 2 + React 19 + Rust</p>
                     <p>WireGuard + OpenVPN + Split Tunnel + Auto-Provisioning</p>
                     <p className="pt-1">powered by <a href="https://effront.gg/en" target="_blank" rel="noopener noreferrer" className="text-bullet-500 hover:text-bullet-400 transition-colors">effront</a></p>
@@ -1451,7 +1451,7 @@ function App() {
 
           {/* Footer */}
           <footer className={`flex items-center justify-center px-4 py-2 border-t ${isDark ? "bg-neutral-900 border-neutral-800" : "bg-white border-neutral-200"}`}>
-            <span className={`text-[10px] ${isDark ? "text-neutral-700" : "text-neutral-500"}`}>Bullet VPN v{updateInfo?.current || "2.3.5"} -- <a href="https://effront.gg/en" target="_blank" rel="noopener noreferrer" className="hover:text-bullet-400 transition-colors">effront</a></span>
+            <span className={`text-[10px] ${isDark ? "text-neutral-700" : "text-neutral-500"}`}>Bullet VPN v{updateInfo?.current || "2.3.6"} -- <a href="https://effront.gg/en" target="_blank" rel="noopener noreferrer" className="hover:text-bullet-400 transition-colors">effront</a></span>
           </footer>
         </div>
       </I18nCtx.Provider>
