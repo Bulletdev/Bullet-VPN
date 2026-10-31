@@ -460,10 +460,7 @@ struct UpdateInfo {
     url: String,
 }
 
-#[tauri::command]
-fn check_update() -> Result<UpdateInfo, String> {
-    let current = env!("CARGO_PKG_VERSION").to_string();
-
+fn fetch_release_json() -> Result<String, String> {
     let output = std::process::Command::new("curl")
         .args([
             "-sL",
@@ -473,8 +470,14 @@ fn check_update() -> Result<UpdateInfo, String> {
         ])
         .output()
         .map_err(|e| format!("curl falhou: {}", e))?;
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
 
-    let body = String::from_utf8_lossy(&output.stdout);
+#[tauri::command]
+fn check_update() -> Result<UpdateInfo, String> {
+    let current = env!("CARGO_PKG_VERSION").to_string();
+    let body = fetch_release_json()?;
+
     let latest = body
         .split("\"tag_name\"")
         .nth(1)
@@ -498,6 +501,66 @@ fn check_update() -> Result<UpdateInfo, String> {
         has_update,
         url: download_url,
     })
+}
+
+#[tauri::command]
+fn self_update() -> Result<String, String> {
+    let body = fetch_release_json()?;
+
+    let asset_url = find_asset_url(&body, ".AppImage")
+        .or_else(|| find_asset_url(&body, ".deb"))
+        .ok_or("Nenhum asset compatível encontrado na release.")?;
+
+    let ext = if asset_url.contains(".AppImage") {
+        ".AppImage"
+    } else {
+        ".deb"
+    };
+    let tmp_dir = std::env::temp_dir().join("bullet-vpn-update");
+    std::fs::create_dir_all(&tmp_dir).map_err(|e| e.to_string())?;
+    let dest = tmp_dir.join(format!("bullet-vpn-latest{}", ext));
+
+    let status = std::process::Command::new("curl")
+        .args(["-sL", "-o", &dest.to_string_lossy(), &asset_url])
+        .status()
+        .map_err(|e| format!("download falhou: {}", e))?;
+    if !status.success() {
+        return Err("Falha no download do update.".into());
+    }
+
+    if ext == ".deb" {
+        let out = std::process::Command::new(permissions::priv_cmd())
+            .args(["dpkg", "-i", &dest.to_string_lossy()])
+            .output()
+            .map_err(|e| format!("dpkg falhou: {}", e))?;
+        if !out.status.success() {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            return Err(format!("Instalação falhou: {}", stderr.trim()));
+        }
+        Ok("Atualizado via .deb. Reinicie o app.".into())
+    } else {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o755))
+                .map_err(|e| e.to_string())?;
+        }
+        let current_exe = std::env::current_exe().map_err(|e| format!("current_exe: {}", e))?;
+        std::fs::copy(&dest, &current_exe)
+            .map_err(|e| format!("Falha ao substituir binário: {}", e))?;
+        Ok("Atualizado via AppImage. Reinicie o app.".into())
+    }
+}
+
+fn find_asset_url(json: &str, suffix: &str) -> Option<String> {
+    for chunk in json.split("\"browser_download_url\"") {
+        if let Some(url) = chunk.split('"').nth(1) {
+            if url.ends_with(suffix) {
+                return Some(url.to_string());
+            }
+        }
+    }
+    None
 }
 
 // ── Entry point ─────────────────────────────────────────────────────
@@ -608,6 +671,7 @@ pub fn run() {
             disable_connection_guard,
             connection_guard_status,
             check_update,
+            self_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

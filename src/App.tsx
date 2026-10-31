@@ -19,6 +19,7 @@ import {
   ChevronRight,
   Wifi,
   WifiOff,
+  Download,
 } from "lucide-react";
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -215,6 +216,10 @@ const translations: Record<Locale, Record<string, string>> = {
     logUpdateAvailable: "Atualizacao disponivel: v{version}",
     logUpToDate: "Versao atual (v{version}) e a mais recente.",
     logUpdateError: "Erro ao verificar atualizacao: {error}",
+    updateNow: "Atualizar",
+    updating: "Atualizando...",
+    logUpdateSuccess: "Atualizado com sucesso! Reinicie o app.",
+    logUpdateFailed: "Falha na atualizacao: {error}",
   },
   "en-US": {
     disconnected: "Disconnected",
@@ -358,6 +363,10 @@ const translations: Record<Locale, Record<string, string>> = {
     logUpdateAvailable: "Update available: v{version}",
     logUpToDate: "Current version (v{version}) is up to date.",
     logUpdateError: "Error checking update: {error}",
+    updateNow: "Update",
+    updating: "Updating...",
+    logUpdateSuccess: "Updated successfully! Restart the app.",
+    logUpdateFailed: "Update failed: {error}",
   },
 };
 
@@ -489,6 +498,7 @@ function App() {
     has_update: boolean;
     url: string;
   } | null>(null);
+  const [updating, setUpdating] = useState(false);
 
   // ── Helpers ─────────────────────────────────────────────────────
 
@@ -1012,6 +1022,19 @@ function App() {
     }
   };
 
+  const doSelfUpdate = async () => {
+    setUpdating(true);
+    try {
+      await invoke<string>("self_update");
+      addLog(t("logUpdateSuccess"));
+      setUpdateInfo(null);
+    } catch (e) {
+      addLog(t("logUpdateFailed", { error: String(e) }));
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   // ── Labels ──────────────────────────────────────────────────────
 
   const stateLabel: Record<TunnelState, string> = {
@@ -1363,13 +1386,20 @@ function App() {
                       <RefreshCw className="w-3 h-3" />{t("verify")}
                     </button>
                   </div>
-                  {updateInfo?.has_update && updateInfo.url && (<p className="mt-2 text-xs text-bullet-400">Download: {updateInfo.url}</p>)}
+                  {updateInfo?.has_update && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <button onClick={doSelfUpdate} disabled={updating} className={`px-3 py-1.5 text-xs rounded font-medium transition-colors flex items-center gap-1.5 ${updating ? "opacity-50 cursor-not-allowed" : ""} bg-bullet-600 text-white hover:bg-bullet-700`}>
+                        <Download className="w-3 h-3" />{updating ? t("updating") : t("updateNow")}
+                      </button>
+                      {updateInfo.url && <a href={updateInfo.url} target="_blank" rel="noopener noreferrer" className="text-xs text-bullet-400 hover:text-bullet-300 underline">GitHub</a>}
+                    </div>
+                  )}
                 </div>
                 {/* About */}
                 <div className={cardCls}>
                   <h2 className={`text-sm font-medium ${headingCls} mb-3`}>{t("about")}</h2>
                   <div className={`space-y-1 text-xs ${subtleCls}`}>
-                    <p>Bullet VPN v2.1.0</p>
+                    <p>Bullet VPN v{updateInfo?.current || "2.2.0"}</p>
                     <p>Tauri 2 + React 19 + Rust</p>
                     <p>WireGuard + OpenVPN + Split Tunnel + Auto-Provisioning</p>
                     <p className={`pt-1 ${isDark ? "text-neutral-700" : "text-neutral-500"}`}>effront</p>
@@ -1382,7 +1412,7 @@ function App() {
 
           {/* Footer */}
           <footer className={`flex items-center justify-center px-4 py-2 border-t ${isDark ? "bg-neutral-900 border-neutral-800" : "bg-white border-neutral-200"}`}>
-            <span className={`text-[10px] ${isDark ? "text-neutral-700" : "text-neutral-500"}`}>Bullet VPN v2.1.0 -- effront</span>
+            <span className={`text-[10px] ${isDark ? "text-neutral-700" : "text-neutral-500"}`}>Bullet VPN v{updateInfo?.current || "2.2.0"} -- effront</span>
           </footer>
         </div>
       </I18nCtx.Provider>
