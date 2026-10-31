@@ -32,6 +32,11 @@ fn run(priv_cmd: &str, args: &[&str]) -> Result<(), String> {
 pub fn setup(iface: &str) -> Result<(), String> {
     let p = permissions::priv_cmd();
 
+    let _ = run(p, &["modprobe", "xt_cgroup"]);
+
+    let (gw, dev) = detect_physical_route(iface)
+        .ok_or("Não foi possível detectar o gateway físico (não-VPN). Verifique sua conexão de rede.")?;
+
     run(p, &["mkdir", "-p", CGROUP_PATH])?;
 
     let classid_path = format!("{}/net_cls.classid", CGROUP_PATH);
@@ -76,30 +81,17 @@ pub fn setup(iface: &str) -> Result<(), String> {
         &["iptables", "-t", "mangle", "-A", "OUTPUT", "-j", CHAIN],
     )?;
 
-    let gateway = detect_default_gateway();
-    let gw = gateway.as_deref().unwrap_or("default");
-
     let _ = run(p, &["ip", "rule", "del", "fwmark", FWMARK, "table", TABLE]);
     run(p, &["ip", "rule", "add", "fwmark", FWMARK, "table", TABLE])?;
 
     let _ = run(p, &["ip", "route", "flush", "table", TABLE]);
 
-    if gw == "default" {
-        run(
-            p,
-            &[
-                "ip", "route", "add", "default", "dev", iface, "table", TABLE,
-            ],
-        )?;
-    } else {
-        let dev = detect_default_device().unwrap_or_else(|| "eth0".to_string());
-        run(
-            p,
-            &[
-                "ip", "route", "add", "default", "via", gw, "dev", &dev, "table", TABLE,
-            ],
-        )?;
-    }
+    run(
+        p,
+        &[
+            "ip", "route", "add", "default", "via", &gw, "dev", &dev, "table", TABLE,
+        ],
+    )?;
 
     fs::write(marker_path(), iface).ok();
     Ok(())
@@ -157,34 +149,51 @@ pub fn is_active() -> bool {
     marker_path().exists()
 }
 
-fn detect_default_gateway() -> Option<String> {
+fn detect_physical_route(vpn_iface: &str) -> Option<(String, String)> {
     let output = Command::new("ip")
         .args(["route", "show", "default"])
         .output()
         .ok()?;
     let stdout = String::from_utf8_lossy(&output.stdout);
-    for line in stdout.lines() {
-        let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.len() >= 3 && parts[0] == "default" && parts[1] == "via" {
-            return Some(parts[2].to_string());
-        }
-    }
-    None
-}
 
-fn detect_default_device() -> Option<String> {
+    for line in stdout.lines() {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() < 3 || parts[0] != "default" || parts[1] != "via" {
+            continue;
+        }
+        let dev = parts
+            .iter()
+            .position(|&p| p == "dev")
+            .and_then(|i| parts.get(i + 1).copied());
+        if let Some(d) = dev {
+            if d == vpn_iface || d.starts_with("bvpn-") {
+                continue;
+            }
+            return Some((parts[2].to_string(), d.to_string()));
+        }
+    }
+
     let output = Command::new("ip")
-        .args(["route", "show", "default"])
+        .args(["route", "show", "table", "main"])
         .output()
         .ok()?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     for line in stdout.lines() {
         let parts: Vec<&str> = line.split_whitespace().collect();
-        if let Some(idx) = parts.iter().position(|&p| p == "dev") {
-            if idx + 1 < parts.len() {
-                return Some(parts[idx + 1].to_string());
+        if parts.len() < 3 || parts[0] != "default" || parts[1] != "via" {
+            continue;
+        }
+        let dev = parts
+            .iter()
+            .position(|&p| p == "dev")
+            .and_then(|i| parts.get(i + 1).copied());
+        if let Some(d) = dev {
+            if d == vpn_iface || d.starts_with("bvpn-") {
+                continue;
             }
+            return Some((parts[2].to_string(), d.to_string()));
         }
     }
+
     None
 }
