@@ -14,6 +14,28 @@ fn truncate_log(path: &PathBuf) {
     }
 }
 
+pub fn cap_log(profile_id: &str) {
+    let path = config_dir().join(format!("{}.log", profile_id));
+    let meta = match fs::metadata(&path) {
+        Ok(m) => m,
+        Err(_) => return,
+    };
+    if meta.len() <= MAX_LOG_BYTES {
+        return;
+    }
+    let keep = 50_000_u64;
+    let mut file = match fs::File::open(&path) {
+        Ok(f) => f,
+        Err(_) => return,
+    };
+    let start = meta.len().saturating_sub(keep);
+    file.seek(SeekFrom::Start(start)).ok();
+    let mut tail = Vec::new();
+    file.read_to_end(&mut tail).ok();
+    drop(file);
+    fs::write(&path, &tail).ok();
+}
+
 fn config_dir() -> PathBuf {
     dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
@@ -60,10 +82,12 @@ pub fn up(profile_id: &str) -> Result<(), String> {
             "--daemon",
             "--writepid",
             &pid.to_string_lossy(),
-            "--log",
+            "--log-append",
             &log_path.to_string_lossy(),
             "--verb",
             "1",
+            "--mute",
+            "10",
         ])
         .output()
         .map_err(|e| format!("Falha ao executar pkexec: {}", e))?;
@@ -92,16 +116,13 @@ pub fn down(profile_id: &str) -> Result<(), String> {
         .trim()
         .to_string();
 
-    let output = Command::new(permissions::priv_cmd())
+    let _ = Command::new(permissions::priv_cmd())
         .args(["kill", &pid])
-        .output()
-        .map_err(|e| e.to_string())?;
+        .output();
 
-    if output.status.success() {
-        fs::remove_file(&pid_file).ok();
-        let log_file = config_dir().join(format!("{}.log", profile_id));
-        fs::remove_file(&log_file).ok();
-    }
+    fs::remove_file(&pid_file).ok();
+    let log_file = config_dir().join(format!("{}.log", profile_id));
+    fs::remove_file(&log_file).ok();
     Ok(())
 }
 

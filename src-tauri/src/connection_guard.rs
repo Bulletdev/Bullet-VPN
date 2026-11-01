@@ -86,12 +86,16 @@ pub fn start(guard: VpnGuard) {
                                 "--daemon",
                                 "--writepid",
                                 &pid_file.to_string_lossy(),
-                                "--log",
+                                "--log-append",
                                 &log.to_string_lossy(),
                                 "--verb",
                                 "1",
+                                "--mute",
+                                "10",
                             ])
                             .output();
+                    } else {
+                        crate::openvpn::cap_log(profile_id);
                     }
                 }
             }
