@@ -1443,7 +1443,7 @@ function App() {
                                   ? "text-yellow-400"
                                   : "text-red-400"
                           }`}>
-                            {t("latency")}: {profileLatency[selectedProfile] === null || profileLatency[selectedProfile] === undefined ? t("checking") : `${profileLatency[selectedProfile]}ms`}
+                            {t("latency")}: {profileLatency[selectedProfile] === undefined ? t("checking") : profileLatency[selectedProfile] === null ? "Timeout" : `${profileLatency[selectedProfile]}ms`}
                           </p>
                         )}
                       </>

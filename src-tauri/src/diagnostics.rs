@@ -61,29 +61,26 @@ pub fn generate_report() -> String {
 /// Ping a host (or host:port endpoint) and return the round-trip
 /// time in milliseconds.
 pub fn ping_host(host: &str) -> Result<u32, String> {
-    let ip = host.split(':').next().unwrap_or(host);
+    use std::net::{TcpStream, ToSocketAddrs};
+    use std::time::{Duration, Instant};
 
-    let output = Command::new("ping")
-        .args(["-c", "1", "-W", "2", ip])
-        .output()
-        .map_err(|e| format!("ping failed: {}", e))?;
+    let addr_str = if host.contains(':') {
+        host.to_string()
+    } else {
+        format!("{}:443", host)
+    };
 
-    if !output.status.success() {
-        return Err("Host unreachable".to_string());
-    }
+    let addr = addr_str
+        .to_socket_addrs()
+        .map_err(|e| format!("resolve failed: {}", e))?
+        .next()
+        .ok_or_else(|| "no address resolved".to_string())?;
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    for line in stdout.lines() {
-        if let Some(pos) = line.find("time=") {
-            let time_str = &line[pos + 5..];
-            if let Some(end) = time_str.find(' ') {
-                if let Ok(ms) = time_str[..end].parse::<f64>() {
-                    return Ok(ms as u32);
-                }
-            }
-        }
-    }
-    Ok(0)
+    let start = Instant::now();
+    TcpStream::connect_timeout(&addr, Duration::from_secs(3))
+        .map_err(|e| format!("connect failed: {}", e))?;
+    let ms = start.elapsed().as_millis() as u32;
+    Ok(ms)
 }
 
 // -- internal helpers ------------------------------------------------
