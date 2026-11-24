@@ -544,6 +544,9 @@ function App() {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
 
+  // Boot state
+  const [ready, setReady] = useState(false);
+
   // VPN state
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<string | null>(null);
@@ -685,13 +688,15 @@ function App() {
   }, [tunnelState, addLog, t]);
 
   useEffect(() => {
-    loadProfiles();
-    loadSshTunnels();
-    loadSettings();
-    invoke<boolean>("check_permissions").then(setPermInstalled).catch(() => {});
-    invoke<boolean>("killswitch_status").then(setKillswitchOn).catch(() => {});
-    invoke<boolean>("dns_protection_status").then(setDnsProtOn).catch(() => {});
-    invoke<boolean>("connection_guard_status").then(setConnGuardOn).catch(() => {});
+    Promise.all([
+      loadProfiles(),
+      loadSshTunnels(),
+      loadSettings(),
+      invoke<boolean>("check_permissions").then(setPermInstalled).catch(() => {}),
+      invoke<boolean>("killswitch_status").then(setKillswitchOn).catch(() => {}),
+      invoke<boolean>("dns_protection_status").then(setDnsProtOn).catch(() => {}),
+      invoke<boolean>("connection_guard_status").then(setConnGuardOn).catch(() => {}),
+    ]).finally(() => setReady(true));
   }, [loadProfiles, loadSshTunnels, loadSettings]);
 
   useEffect(() => {
@@ -1249,6 +1254,15 @@ function App() {
   const subtleCls = isDark ? "text-neutral-500" : "text-neutral-600";
 
   // ── Render ──────────────────────────────────────────────────────
+
+  if (!ready) {
+    return (
+      <div className={`flex flex-col items-center justify-center h-screen gap-3 ${isDark ? "bg-neutral-950" : "bg-neutral-50"}`}>
+        <ShieldIcon className="w-10 h-10 text-bullet-500 animate-pulse" />
+        <span className={`text-sm font-medium ${isDark ? "text-neutral-400" : "text-neutral-600"}`}>Bullet VPN</span>
+      </div>
+    );
+  }
 
   return (
     <ThemeCtx.Provider value={isDark}>
