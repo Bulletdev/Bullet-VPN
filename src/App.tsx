@@ -1259,8 +1259,9 @@ function App() {
   if (!ready) {
     return (
       <div className={`flex flex-col items-center justify-center h-screen gap-3 ${isDark ? "bg-neutral-950" : "bg-neutral-50"}`}>
-        <ShieldIcon className="w-10 h-10 text-bullet-500 animate-pulse" />
-        <span className={`text-sm font-medium ${isDark ? "text-neutral-400" : "text-neutral-600"}`}>Bullet VPN</span>
+        <img src="/logo.png" alt="Bullet VPN" className="w-16 h-16 animate-pulse" />
+        <span className={`text-sm font-semibold ${isDark ? "text-neutral-400" : "text-neutral-600"}`}>Bullet VPN</span>
+        <span className={`text-xs ${isDark ? "text-neutral-600" : "text-neutral-500"}`}>Initializing...</span>
       </div>
     );
   }

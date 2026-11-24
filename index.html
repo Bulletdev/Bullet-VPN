@@ -4,8 +4,28 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Bullet VPN</title>
+    <style>
+      body { margin: 0; background: #0a0a0a; }
+      #splash {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        gap: 12px;
+      }
+      #splash img { width: 64px; height: 64px; animation: pulse 1.5s ease-in-out infinite; }
+      #splash .name { color: #a3a3a3; font: 600 14px/1 system-ui, sans-serif; }
+      #splash .status { color: #525252; font: 400 12px/1 system-ui, sans-serif; }
+      @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+    </style>
   </head>
   <body class="bg-neutral-950 text-neutral-100">
+    <div id="splash">
+      <img src="/logo.png" alt="Bullet VPN" />
+      <span class="name">Bullet VPN</span>
+      <span class="status">Initializing...</span>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
