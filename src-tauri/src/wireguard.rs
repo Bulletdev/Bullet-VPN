@@ -16,22 +16,36 @@ pub fn write_config(iface_name: &str, profile: &Profile) -> Result<PathBuf, Stri
     let dir = config_dir();
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
 
+    let mtu_line = if profile.mtu > 0 {
+        format!("MTU = {}\n", profile.mtu)
+    } else {
+        String::new()
+    };
+
+    let psk_line = if profile.preshared_key.is_empty() {
+        String::new()
+    } else {
+        format!("PresharedKey = {}\n", profile.preshared_key)
+    };
+
     let config = format!(
         "[Interface]
 PrivateKey = {}
 Address = {}
 DNS = {}
-
+{}
 [Peer]
 PublicKey = {}
-Endpoint = {}
+{}Endpoint = {}
 AllowedIPs = {}
 PersistentKeepalive = 25
 ",
         profile.private_key,
         profile.address,
         profile.dns,
+        mtu_line,
         profile.server_pubkey,
+        psk_line,
         profile.endpoint,
         profile.allowed_ips,
     );

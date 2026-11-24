@@ -1,7 +1,11 @@
 mod connection_guard;
+mod daita;
 mod db;
+mod diagnostics;
 mod dns;
 mod killswitch;
+mod lockdown;
+mod obfuscation;
 mod openvpn;
 mod permissions;
 mod profiles;
@@ -20,8 +24,10 @@ use tauri::{Emitter, Manager, State};
 struct AppState {
     store: Mutex<ProfileStore>,
     tunnel_store: Mutex<TunnelStore>,
+    db: Arc<db::Database>,
     active_interface: Mutex<Option<String>>,
     active_ovpn: Mutex<Option<String>>,
+    active_profile_id: Mutex<Option<String>>,
 }
 
 // ── Profile commands ────────────────────────────────────────────────
@@ -62,6 +68,18 @@ fn import_ovpn(state: State<AppState>, profile_id: String, content: String) -> R
         store.save().map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+// ── Settings commands ───────────────────────────────────────────────
+
+#[tauri::command]
+fn get_setting(state: State<AppState>, key: String) -> Result<Option<String>, String> {
+    Ok(state.db.get_setting(&key))
+}
+
+#[tauri::command]
+fn set_setting(state: State<AppState>, key: String, value: String) -> Result<(), String> {
+    state.db.set_setting(&key, &value)
 }
 
 // ── Key generation commands ─────────────────────────────────────────
@@ -138,7 +156,7 @@ fn check_connectivity(host: String, port: u16) -> Result<String, String> {
 // ── VPN commands ────────────────────────────────────────────────────
 
 #[tauri::command]
-fn connect(state: State<AppState>, profile_id: String) -> Result<(), String> {
+fn connect(state: State<AppState>, profile_id: String, _allow_lan: bool) -> Result<(), String> {
     let profile = {
         let store = state.store.lock().map_err(|e| e.to_string())?;
         store
@@ -160,11 +178,64 @@ fn connect(state: State<AppState>, profile_id: String) -> Result<(), String> {
             *active = Some(profile.id.clone());
         }
     }
+
+    // Track active profile
+    {
+        let mut ap = state.active_profile_id.lock().map_err(|e| e.to_string())?;
+        *ap = Some(profile_id.clone());
+    }
+
+    // Auto-start SSH tunnels linked to this profile
+    auto_start_tunnels(&state, &profile_id);
+
+    // Start DAITA traffic padding if enabled on this profile
+    if profile.daita {
+        let gw = profile.endpoint.split(':').next().unwrap_or("").to_string();
+        if !gw.is_empty() {
+            if let Err(e) = daita::start(&gw) {
+                eprintln!("[DAITA] failed to start: {}", e);
+            }
+        }
+    }
+
     Ok(())
+}
+
+fn auto_start_tunnels(state: &AppState, profile_id: &str) {
+    let tunnels = state.db.list_ssh_tunnels_by_profile(profile_id);
+    for tunnel in &tunnels {
+        if ssh::is_running(&tunnel.id) {
+            continue;
+        }
+        if let Err(e) = ssh::start(tunnel) {
+            eprintln!("[SSH] failed to auto-start tunnel {}: {}", tunnel.name, e);
+        }
+    }
+}
+
+fn auto_stop_tunnels(state: &AppState, profile_id: &str) {
+    let tunnels = state.db.list_ssh_tunnels_by_profile(profile_id);
+    for tunnel in &tunnels {
+        if !ssh::is_running(&tunnel.id) {
+            continue;
+        }
+        if let Err(e) = ssh::stop(&tunnel.id) {
+            eprintln!("[SSH] failed to auto-stop tunnel {}: {}", tunnel.name, e);
+        }
+    }
 }
 
 #[tauri::command]
 fn disconnect(state: State<AppState>) -> Result<(), String> {
+    // Auto-stop SSH tunnels linked to the active profile
+    let profile_id = {
+        let mut ap = state.active_profile_id.lock().map_err(|e| e.to_string())?;
+        ap.take()
+    };
+    if let Some(ref pid) = profile_id {
+        auto_stop_tunnels(&state, pid);
+    }
+
     connection_guard::stop();
 
     if killswitch::is_active() {
@@ -175,6 +246,12 @@ fn disconnect(state: State<AppState>) -> Result<(), String> {
     }
     if split_tunnel::is_active() {
         let _ = split_tunnel::teardown();
+    }
+    if obfuscation::is_running() {
+        obfuscation::stop();
+    }
+    if daita::is_active() {
+        daita::stop();
     }
     connection_guard::stop();
 
@@ -269,8 +346,8 @@ fn uninstall_permissions() -> Result<(), String> {
 // ── Kill switch commands ────────────────────────────────────────────
 
 #[tauri::command]
-fn enable_killswitch(iface: String, endpoint_ip: String) -> Result<(), String> {
-    killswitch::enable(&iface, &endpoint_ip)
+fn enable_killswitch(iface: String, endpoint_ip: String, allow_lan: bool) -> Result<(), String> {
+    killswitch::enable(&iface, &endpoint_ip, allow_lan)
 }
 
 #[tauri::command]
@@ -281,6 +358,28 @@ fn disable_killswitch() -> Result<(), String> {
 #[tauri::command]
 fn killswitch_status() -> bool {
     killswitch::is_active()
+}
+
+// ── Lockdown commands ───────────────────────────────────────────────
+
+#[tauri::command]
+fn enable_lockdown(allow_lan: bool) -> Result<(), String> {
+    lockdown::enable(allow_lan)
+}
+
+#[tauri::command]
+fn disable_lockdown() -> Result<(), String> {
+    lockdown::disable()
+}
+
+#[tauri::command]
+fn lockdown_status() -> bool {
+    lockdown::is_active()
+}
+
+#[tauri::command]
+fn restore_lockdown() -> Result<(), String> {
+    lockdown::restore_on_boot()
 }
 
 // ── DNS protection commands ─────────────────────────────────────────
@@ -303,6 +402,47 @@ fn dns_protection_status() -> bool {
 #[tauri::command]
 fn check_dns_leak() -> Result<Vec<String>, String> {
     dns::check_leak()
+}
+
+// ── Content blocker commands ───────────────────────────────────────
+
+#[tauri::command]
+fn get_blocker_dns(state: State<AppState>) -> Result<Option<String>, String> {
+    let block_ads = state.db.get_setting("block_ads").as_deref() == Some("true");
+    let block_trackers = state.db.get_setting("block_trackers").as_deref() == Some("true");
+    let block_malware = state.db.get_setting("block_malware").as_deref() == Some("true");
+    let block_adult = state.db.get_setting("block_adult").as_deref() == Some("true");
+    Ok(dns::blocker_dns(
+        block_ads,
+        block_trackers,
+        block_malware,
+        block_adult,
+    ))
+}
+
+#[tauri::command]
+fn save_blocker_settings(
+    state: State<AppState>,
+    block_ads: bool,
+    block_trackers: bool,
+    block_malware: bool,
+    block_adult: bool,
+) -> Result<(), String> {
+    state
+        .db
+        .set_setting("block_ads", if block_ads { "true" } else { "false" })?;
+    state.db.set_setting(
+        "block_trackers",
+        if block_trackers { "true" } else { "false" },
+    )?;
+    state.db.set_setting(
+        "block_malware",
+        if block_malware { "true" } else { "false" },
+    )?;
+    state
+        .db
+        .set_setting("block_adult", if block_adult { "true" } else { "false" })?;
+    Ok(())
 }
 
 // ── Process list for split tunnel ──────────────────────────────────
@@ -414,6 +554,72 @@ fn read_ovpn_log(state: State<AppState>) -> String {
         Some(id) => openvpn::read_log(id),
         None => String::new(),
     }
+}
+
+// ── Diagnostics commands ───────────────────────────────────────────
+
+#[tauri::command]
+fn generate_diagnostic_report() -> String {
+    diagnostics::generate_report()
+}
+
+#[tauri::command]
+fn ping_profile_endpoint(endpoint: String) -> Result<u32, String> {
+    diagnostics::ping_host(&endpoint)
+}
+
+// ── Obfuscation commands ──────────────────────────────────────────
+
+#[tauri::command]
+fn start_obfuscation(
+    obfuscation_type: String,
+    local_port: u16,
+    remote_endpoint: String,
+) -> Result<u16, String> {
+    match obfuscation_type.as_str() {
+        "udp2tcp" => obfuscation::start_udp2tcp(local_port, &remote_endpoint),
+        "shadowsocks" => {
+            let parts: Vec<&str> = remote_endpoint.split(':').collect();
+            if parts.len() != 2 {
+                return Err("Invalid endpoint format, expected host:port".into());
+            }
+            let remote_host = parts[0];
+            let remote_port: u16 = parts[1]
+                .parse()
+                .map_err(|_| "Invalid port in endpoint".to_string())?;
+            obfuscation::start_shadowsocks(local_port, remote_host, remote_port, "")
+        }
+        "obfs4" => obfuscation::start_obfs4(local_port, &remote_endpoint, "", 0),
+        _ => Err(format!("Unknown obfuscation type: {}", obfuscation_type)),
+    }
+}
+
+#[tauri::command]
+fn stop_obfuscation() -> Result<(), String> {
+    obfuscation::stop();
+    Ok(())
+}
+
+#[tauri::command]
+fn obfuscation_status() -> bool {
+    obfuscation::is_running()
+}
+
+// ── DAITA commands ────────────────────────────────────────────────
+
+#[tauri::command]
+fn enable_daita(gateway_ip: String) -> Result<(), String> {
+    daita::start(&gateway_ip)
+}
+
+#[tauri::command]
+fn disable_daita() {
+    daita::stop();
+}
+
+#[tauri::command]
+fn daita_status() -> bool {
+    daita::is_active()
 }
 
 // ── SSH tunnel commands ─────────────────────────────────────────────
@@ -663,20 +869,25 @@ pub fn run() {
     }
     connection_guard::stop();
 
+    // Restore persistent lockdown rules if they were active
+    let _ = lockdown::restore_on_boot();
+
     let database = Arc::new(db::Database::open().expect("failed to open database"));
     let store = ProfileStore::new(database.clone());
-    let tunnel_store = TunnelStore::new(database);
+    let tunnel_store = TunnelStore::new(database.clone());
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(AppState {
             store: Mutex::new(store),
             tunnel_store: Mutex::new(tunnel_store),
+            db: database,
             active_interface: Mutex::new(None),
             active_ovpn: Mutex::new(None),
+            active_profile_id: Mutex::new(None),
         })
         .setup(|app| {
-            let label = MenuItem::with_id(app, "label", "Bullet VPN v2.1.0", false, None::<&str>)?;
+            let label = MenuItem::with_id(app, "label", "Bullet VPN v3.0.0", false, None::<&str>)?;
             let show = MenuItem::with_id(app, "show", "Mostrar", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Sair", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&label, &show, &quit])?;
@@ -715,6 +926,25 @@ pub fn run() {
                 });
             }
 
+            // Auto-connect on startup if configured
+            let app_state: State<AppState> = app.state();
+            let should_connect = app_state.db.get_setting("auto_connect");
+            if should_connect.as_deref() == Some("true") {
+                if let Some(pid) = app_state.db.get_setting("default_profile_id") {
+                    let profile = {
+                        let store = app_state.store.lock().unwrap_or_else(|e| e.into_inner());
+                        store.get(&pid)
+                    };
+                    if let Some(profile) = profile {
+                        let handle = app.handle().clone();
+                        std::thread::spawn(move || {
+                            let _ = handle.emit("auto-connect", &pid);
+                        });
+                        eprintln!("[AUTO-CONNECT] scheduled for profile: {}", profile.name);
+                    }
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -722,6 +952,8 @@ pub fn run() {
             add_profile,
             remove_profile,
             import_ovpn,
+            get_setting,
+            set_setting,
             generate_keypair,
             derive_public_key,
             connect,
@@ -734,6 +966,10 @@ pub fn run() {
             enable_killswitch,
             disable_killswitch,
             killswitch_status,
+            enable_lockdown,
+            disable_lockdown,
+            lockdown_status,
+            restore_lockdown,
             enable_dns_protection,
             disable_dns_protection,
             dns_protection_status,
@@ -759,6 +995,16 @@ pub fn run() {
             connection_guard_status,
             check_update,
             self_update,
+            generate_diagnostic_report,
+            ping_profile_endpoint,
+            start_obfuscation,
+            stop_obfuscation,
+            obfuscation_status,
+            get_blocker_dns,
+            save_blocker_settings,
+            enable_daita,
+            disable_daita,
+            daita_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

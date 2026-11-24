@@ -34,14 +34,16 @@
 
 ```
 +---------------------------------------------------------------------------+
-|  Sec: Keys Curve25519 native  + iptables kill switch                      |
+|  Sec: Curve25519 + PresharedKey (quantum-resistant) + iptables lockdown   |
 |  Performance: WireGuard kernel-level for max speed                        |
 |  Protocol:  WireGuard + OpenVPN (dual stack complete)                     |
+|  Privacy:   DAITA traffic padding, DNS protection, content blockers       |
+|  Obfuscation: UDP2TCP, Shadowsocks, obfs4 pluggable transport            |
 |  Beginner-friendly,  Clean Interface, 3 clicks to begin                   |
 |  Zero Logs: No data saved or remotely sent                                |
-|  Privacy:   DNS protection via DNAT, kill switch via iptables             |
+|  SSH Tunnels: Auto-start with VPN, local/remote/SOCKS integrated          |
+|  Diagnostics: One-click sanitized problem reports                         |
 |  Multiplataform:  Linux (ready), Windows e macOS (soon)                   |
-|  SSH Tunnels: Port forwarding local/remote/SOCKS integrated               |
 +---------------------------------------------------------------------------+
 ```
 
@@ -57,21 +59,42 @@
 |  [x] WireGuard       -- wg-quick up/down, kernel-level tunnel             |
 |  [x] OpenVPN         -- .ovpn import, daemon management via PID           |
 |  [x] Status          -- real-time transfer RX/TX from /proc/net/dev       |
-|  [x] Config store    -- profiles persisted in ~/.config/bullet-vpn/       |
+|  [x] Config store    -- SQLite + AES-256-GCM encrypted keys               |
 |  [x] Import          -- paste .conf (WG) or .ovpn (OpenVPN) to import     |
 |  [x] Conflict detect -- auto teardown conflicting WG interfaces           |
 |  [x] Permissions     -- one-time sudoers install, no more password        |
+|  [x] Auto-connect    -- connect on startup with default profile           |
+|  [x] Custom MTU      -- per-profile MTU override                          |
+|  [x] Custom DNS      -- per-profile DNS server                            |
+|  [x] Server health   -- latency ping (30s polling, color-coded)           |
 |                                                                           |
 |  SECURITY                                                                 |
 |  [x] Kill switch     -- iptables OUTPUT chain blocking non-tunnel         |
+|  [x] Lockdown mode   -- persistent firewall blocking ALL non-VPN traffic  |
+|  [x] LAN sharing     -- toggle LAN access on/off per connection           |
 |  [x] DNS protection  -- iptables DNAT forcing DNS through tunnel          |
+|  [x] Content blockers-- ads/trackers/malware/adult via AdGuard DNS        |
+|  [x] PresharedKey    -- quantum-resistant PSK per profile (WireGuard)     |
+|  [x] DAITA           -- traffic padding to defeat pattern analysis        |
 |  [x] Route control   -- granular AllowedIPs per profile                   |
 |  [x] Split tunneling -- per-app routing via cgroup (Linux)                |
+|                                                                           |
+|  OBFUSCATION                                                              |
+|  [x] UDP2TCP         -- wrap WireGuard UDP in fake TCP (udp2raw)          |
+|  [x] Shadowsocks     -- AES-256-GCM tunnel via ss-local                   |
+|  [x] obfs4           -- pluggable transport bridge (obfs4proxy)           |
+|  [x] Multi-hop       -- chain two VPN profiles for double encryption      |
 |                                                                           |
 |  SSH TUNNELS                                                              |
 |  [x] Tunnel manager  -- local/remote/dynamic (SOCKS) port forwarding      |
 |  [x] Tunnel profiles -- save frequent tunnels (e.g. "DBeaver:15432")      |
+|  [x] Auto-start      -- tunnels linked to profiles start/stop with VPN    |
 |  [x] Auto-reconnect  -- persistent tunnels that survive network changes   |
+|                                                                           |
+|  DIAGNOSTICS                                                              |
+|  [x] Problem report  -- system info, routes, firewall, WG status          |
+|  [x] Sanitized       -- private keys auto-redacted from reports           |
+|  [x] Copy to clip    -- one-click export for support                      |
 |                                                                           |
 |  AUTO-PROVISIONING                                                        |
 |  [x] SSH register    -- auto-register peer on remote server via SSH       |
@@ -199,13 +222,17 @@ npx tauri build
 |              |  Tauri IPC  |              |
 |  +-------------------------------------+  |
 |  |    Rust Backend (privileged)        |  |
-|  |  - wireguard.rs   (wg-quick)        |  |
+|  |  - wireguard.rs   (wg-quick + PSK)  |  |
 |  |  - openvpn.rs     (openvpn daemon)  |  |
 |  |  - killswitch.rs  (iptables chain)  |  |
-|  |  - dns.rs         (iptables DNAT)   |  |
+|  |  - lockdown.rs    (persistent FW)   |  |
+|  |  - dns.rs         (DNAT + blockers) |  |
 |  |  - ssh.rs         (ssh -L/-R/-D)    |  |
+|  |  - obfuscation.rs (ss/udp2tcp/obfs4)|  |
+|  |  - daita.rs       (traffic padding) |  |
+|  |  - diagnostics.rs (problem report)  |  |
+|  |  - db.rs          (SQLite + AES)    |  |
 |  |  - permissions.rs (sudoers mgmt)    |  |
-|  |  - profiles.rs    (JSON CRUD)       |  |
 |  +-------------------------------------+  |
 +-------------------------------------------+
          |              |             |
@@ -225,12 +252,16 @@ Bullet-VPN/
     src/
       lib.rs                  Tauri commands + state management
       profiles.rs             VPN profile CRUD (WG + OVPN)
-      wireguard.rs            wg-quick up/down, config writer, conflict detect
+      wireguard.rs            wg-quick up/down, config writer, PSK support
       openvpn.rs              openvpn daemon, PID tracking, .ovpn import
       killswitch.rs           iptables OUTPUT chain (BULLET_VPN_KS)
-      dns.rs                  iptables nat DNAT for DNS protection
+      lockdown.rs             persistent firewall (BULLET_VPN_LD)
+      dns.rs                  iptables DNAT + content blocker DNS
       ssh.rs                  SSH tunnel manager (local/remote/dynamic)
-      db.rs                   SQLite persistence + AES-256-GCM encryption
+      obfuscation.rs          UDP2TCP, Shadowsocks, obfs4 subprocess mgmt
+      daita.rs                traffic padding (anti pattern analysis)
+      diagnostics.rs          system report + server health check
+      db.rs                   SQLite + AES-256-GCM + settings + migrations
       permissions.rs          sudoers install/uninstall for NOPASSWD
       split_tunnel.rs         cgroup net_cls per-PID routing
       connection_guard.rs     background monitor, auto-reconnect on drop
@@ -312,12 +343,17 @@ After install, all VPN operations run via `sudo` without prompts.
 +---------------------------------------------------------------------------+
 |  SECURITY MODEL                                                           |
 +---------------------------------------------------------------------------+
-|  Keys: Curve25519 (native WireGuard)                                      |
+|  Keys: Curve25519 (native WireGuard) + PresharedKey (quantum-resistant)   |
+|  Encryption: AES-256-GCM for all stored keys and secrets (SQLite)         |
 |  Protocols: WireGuard (audited) + OpenVPN (audited)                       |
-|  DNS: Cloudflare (1.1.1.1), Quad9, Google, OpenDNS (configurable)         |
+|  DNS: Per-profile DNS + content blockers via AdGuard DNS                  |
 |  Kill Switch: iptables OUTPUT chain (REJECT, not DROP)                    |
+|  Lockdown: Persistent iptables rules surviving reboot (BULLET_VPN_LD)     |
 |  DNS Protection: iptables NAT DNAT (transparent, no resolv.conf changes)  |
+|  DAITA: Traffic padding to defeat AI-guided traffic analysis              |
+|  Obfuscation: UDP2TCP / Shadowsocks / obfs4 (censorship circumvention)    |
 |  Logs: Local only (~/.config/bullet-vpn/), no data sent to servers        |
+|  Diagnostics: Private keys auto-redacted from problem reports             |
 |  Configs: 0600 file permissions for .conf and .ovpn files                 |
 |  Conflicts: Automatic detection and teardown of conflicting WG interfaces |
 |  Privileges: sudoers NOPASSWD for specific commands only, never ALL       |
@@ -412,6 +448,12 @@ npm run build            # production build to dist/
 |   7   |  Auto-provisioning via SSH               |  DONE    |
 |   8   |  Auto-reconnect, connection guard        |  DONE    |
 |   9   |  Theme, i18n, update check, packaging    |  DONE    |
+|  10   |  Auto-connect, auto-start SSH tunnels    |  DONE    |
+|  11   |  Lockdown mode, LAN sharing toggle       |  DONE    |
+|  12   |  Custom DNS, content blockers, MTU       |  DONE    |
+|  13   |  Obfuscation (UDP2TCP, SS, obfs4)        |  DONE    |
+|  14   |  Multi-hop, PresharedKey, DAITA          |  DONE    |
+|  15   |  Diagnostics, server health check        |  DONE    |
 +=======+==========================================+==========+
 ```
 
