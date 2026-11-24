@@ -39,10 +39,7 @@ pub fn enable(allow_lan: bool) -> Result<(), String> {
     )?;
 
     // Allow OpenVPN interfaces (tun*)
-    run(
-        p,
-        &["iptables", "-A", CHAIN, "-o", "tun+", "-j", "ACCEPT"],
-    )?;
+    run(p, &["iptables", "-A", CHAIN, "-o", "tun+", "-j", "ACCEPT"])?;
 
     // Allow established/related connections
     run(
@@ -165,8 +162,7 @@ fn save_rules(priv_cmd: &str) -> Result<(), String> {
         .unwrap_or(&PathBuf::from("."))
         .to_path_buf();
     fs::create_dir_all(&dir).ok();
-    fs::write(rules_path(), &output.stdout)
-        .map_err(|e| format!("rules write: {}", e))?;
+    fs::write(rules_path(), &output.stdout).map_err(|e| format!("rules write: {}", e))?;
 
     Ok(())
 }

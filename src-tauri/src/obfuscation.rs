@@ -32,7 +32,9 @@ pub fn start_udp2tcp(local_port: u16, remote_endpoint: &str) -> Result<u16, Stri
         .map_err(|e| format!("udp2raw failed to start: {e}"))?;
 
     let pid = child.id();
-    *OBFUSCATION_PROCESS.lock().unwrap_or_else(|e| e.into_inner()) = Some(pid);
+    *OBFUSCATION_PROCESS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner()) = Some(pid);
 
     Ok(listen_port)
 }
@@ -69,13 +71,17 @@ pub fn start_shadowsocks(
         .map_err(|e| format!("ss-local failed to start: {e}"))?;
 
     let pid = child.id();
-    *OBFUSCATION_PROCESS.lock().unwrap_or_else(|e| e.into_inner()) = Some(pid);
+    *OBFUSCATION_PROCESS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner()) = Some(pid);
 
     Ok(listen_port)
 }
 
 pub fn stop() {
-    let mut proc = OBFUSCATION_PROCESS.lock().unwrap_or_else(|e| e.into_inner());
+    let mut proc = OBFUSCATION_PROCESS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     if let Some(pid) = proc.take() {
         let _ = Command::new("kill").arg(pid.to_string()).output();
     }
@@ -100,11 +106,11 @@ pub fn start_obfs4(
     let child = Command::new("obfs4proxy")
         .env("TOR_PT_MANAGED_TRANSPORT_VER", "1")
         .env("TOR_PT_CLIENT_TRANSPORTS", "obfs4")
-        .env("TOR_PT_STATE_LOCATION", state_dir.to_string_lossy().as_ref())
         .env(
-            "TOR_PT_EXIT_ON_STDIN_CLOSE",
-            "0",
+            "TOR_PT_STATE_LOCATION",
+            state_dir.to_string_lossy().as_ref(),
         )
+        .env("TOR_PT_EXIT_ON_STDIN_CLOSE", "0")
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
@@ -112,7 +118,9 @@ pub fn start_obfs4(
         .map_err(|e| format!("obfs4proxy failed to start: {e}"))?;
 
     let pid = child.id();
-    *OBFUSCATION_PROCESS.lock().unwrap_or_else(|e| e.into_inner()) = Some(pid);
+    *OBFUSCATION_PROCESS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner()) = Some(pid);
 
     // obfs4proxy speaks the PT spec on stdout - in practice WireGuard
     // connects to bridge_addr through the SOCKS port obfs4proxy opens.
@@ -128,7 +136,9 @@ pub fn start_obfs4(
 }
 
 pub fn is_running() -> bool {
-    let proc = OBFUSCATION_PROCESS.lock().unwrap_or_else(|e| e.into_inner());
+    let proc = OBFUSCATION_PROCESS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     match *proc {
         Some(pid) => std::path::Path::new(&format!("/proc/{}", pid)).exists(),
         None => false,

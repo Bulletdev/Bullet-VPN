@@ -12,15 +12,9 @@ pub fn generate_report() -> String {
 
     // -- System Info --
     report.push_str(&section("System Info"));
-    report.push_str(&format!(
-        "App version: {}\n",
-        env!("CARGO_PKG_VERSION")
-    ));
+    report.push_str(&format!("App version: {}\n", env!("CARGO_PKG_VERSION")));
     report.push_str(&format!("OS: {}\n", read_os_info()));
-    report.push_str(&format!(
-        "Kernel: {}\n",
-        run_cmd("uname", &["-r"]).trim()
-    ));
+    report.push_str(&format!("Kernel: {}\n", run_cmd("uname", &["-r"]).trim()));
 
     // -- Network Interfaces --
     report.push_str(&section("Network Interfaces"));
@@ -50,7 +44,10 @@ pub fn generate_report() -> String {
     // -- Firewall Rules --
     report.push_str(&section("Firewall Rules"));
     report.push_str("-- filter table --\n");
-    report.push_str(&run_cmd(priv_cmd, &["iptables", "-L", "-n", "--line-numbers"]));
+    report.push_str(&run_cmd(
+        priv_cmd,
+        &["iptables", "-L", "-n", "--line-numbers"],
+    ));
     report.push_str("\n-- nat table --\n");
     report.push_str(&run_cmd(priv_cmd, &["iptables", "-t", "nat", "-L", "-n"]));
 

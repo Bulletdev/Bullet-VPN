@@ -412,7 +412,12 @@ fn get_blocker_dns(state: State<AppState>) -> Result<Option<String>, String> {
     let block_trackers = state.db.get_setting("block_trackers").as_deref() == Some("true");
     let block_malware = state.db.get_setting("block_malware").as_deref() == Some("true");
     let block_adult = state.db.get_setting("block_adult").as_deref() == Some("true");
-    Ok(dns::blocker_dns(block_ads, block_trackers, block_malware, block_adult))
+    Ok(dns::blocker_dns(
+        block_ads,
+        block_trackers,
+        block_malware,
+        block_adult,
+    ))
 }
 
 #[tauri::command]
@@ -423,10 +428,20 @@ fn save_blocker_settings(
     block_malware: bool,
     block_adult: bool,
 ) -> Result<(), String> {
-    state.db.set_setting("block_ads", if block_ads { "true" } else { "false" })?;
-    state.db.set_setting("block_trackers", if block_trackers { "true" } else { "false" })?;
-    state.db.set_setting("block_malware", if block_malware { "true" } else { "false" })?;
-    state.db.set_setting("block_adult", if block_adult { "true" } else { "false" })?;
+    state
+        .db
+        .set_setting("block_ads", if block_ads { "true" } else { "false" })?;
+    state.db.set_setting(
+        "block_trackers",
+        if block_trackers { "true" } else { "false" },
+    )?;
+    state.db.set_setting(
+        "block_malware",
+        if block_malware { "true" } else { "false" },
+    )?;
+    state
+        .db
+        .set_setting("block_adult", if block_adult { "true" } else { "false" })?;
     Ok(())
 }
 
@@ -574,9 +589,7 @@ fn start_obfuscation(
                 .map_err(|_| "Invalid port in endpoint".to_string())?;
             obfuscation::start_shadowsocks(local_port, remote_host, remote_port, "")
         }
-        "obfs4" => {
-            obfuscation::start_obfs4(local_port, &remote_endpoint, "", 0)
-        }
+        "obfs4" => obfuscation::start_obfs4(local_port, &remote_endpoint, "", 0),
         _ => Err(format!("Unknown obfuscation type: {}", obfuscation_type)),
     }
 }

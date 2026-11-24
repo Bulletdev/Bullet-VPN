@@ -73,7 +73,7 @@ impl Database {
             .is_ok();
         if !has_profile_id {
             conn.execute_batch(
-                "ALTER TABLE ssh_tunnels ADD COLUMN profile_id TEXT NOT NULL DEFAULT '';"
+                "ALTER TABLE ssh_tunnels ADD COLUMN profile_id TEXT NOT NULL DEFAULT '';",
             )
             .ok();
         }
@@ -93,14 +93,10 @@ impl Database {
         }
 
         // migrate: add mtu column if missing
-        let has_mtu: bool = conn
-            .prepare("SELECT mtu FROM profiles LIMIT 0")
-            .is_ok();
+        let has_mtu: bool = conn.prepare("SELECT mtu FROM profiles LIMIT 0").is_ok();
         if !has_mtu {
-            conn.execute_batch(
-                "ALTER TABLE profiles ADD COLUMN mtu INTEGER NOT NULL DEFAULT 0;",
-            )
-            .ok();
+            conn.execute_batch("ALTER TABLE profiles ADD COLUMN mtu INTEGER NOT NULL DEFAULT 0;")
+                .ok();
         }
 
         // migrate: add preshared_key and daita columns if missing
@@ -217,7 +213,8 @@ impl Database {
                 row.get::<_, String>(10)?,
                 row.get::<_, i64>(11).unwrap_or(0),
                 row.get::<_, String>(12).unwrap_or_default(),
-                row.get::<_, String>(13).unwrap_or_else(|_| "off".to_string()),
+                row.get::<_, String>(13)
+                    .unwrap_or_else(|_| "off".to_string()),
                 row.get::<_, i64>(14).unwrap_or(0),
                 row.get::<_, i64>(15).unwrap_or(0),
                 row.get::<_, String>(16).unwrap_or_default(),
@@ -228,8 +225,26 @@ impl Database {
         .map(|rows| {
             rows.filter_map(|r| r.ok())
                 .map(
-                    |(id, name, vt, endpoint, spk, pk_enc, pubk, addr, aips, dns, ovpn,
-                      mh, entry_pid, obfs, obfs_port, mtu_val, psk_enc, daita_val)| {
+                    |(
+                        id,
+                        name,
+                        vt,
+                        endpoint,
+                        spk,
+                        pk_enc,
+                        pubk,
+                        addr,
+                        aips,
+                        dns,
+                        ovpn,
+                        mh,
+                        entry_pid,
+                        obfs,
+                        obfs_port,
+                        mtu_val,
+                        psk_enc,
+                        daita_val,
+                    )| {
                         let private_key = self.decrypt(&pk_enc).unwrap_or_default();
                         let preshared_key = self.decrypt(&psk_enc).unwrap_or_default();
                         Profile {
