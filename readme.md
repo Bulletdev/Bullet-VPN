@@ -38,7 +38,7 @@
 |  Performance: WireGuard kernel-level for max speed                        |
 |  Protocol:  WireGuard + OpenVPN (dual stack complete)                     |
 |  Privacy:   DAITA traffic padding, DNS protection, content blockers       |
-|  Obfuscation: UDP2TCP, Shadowsocks, obfs4 pluggable transport            |
+|  Obfuscation: UDP2TCP, Shadowsocks, obfs4 pluggable transport             |
 |  Beginner-friendly,  Clean Interface, 3 clicks to begin                   |
 |  Zero Logs: No data saved or remotely sent                                |
 |  SSH Tunnels: Auto-start with VPN, local/remote/SOCKS integrated          |
