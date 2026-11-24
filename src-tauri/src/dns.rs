@@ -124,30 +124,53 @@ pub fn restore() -> Result<(), String> {
     Ok(())
 }
 
-/// Returns the appropriate AdGuard DNS server address based on active content blockers.
+/// Returns the appropriate DNS server address based on active content blockers.
 /// Returns None if no blockers are enabled (use profile DNS instead).
 ///
-/// AdGuard DNS addresses:
-///   - Default (ads + trackers): 94.140.14.14
-///   - Family (ads + trackers + adult): 94.140.14.15
-///   - Non-filtering (malware only via default): 94.140.14.14
+/// DNS providers used:
+///   - Ads/Trackers: AdGuard Default (94.140.14.14) - blocks ads + trackers
+///   - Malware: Quad9 (9.9.9.9) - blocks malware/phishing domains
+///   - Gambling: CleanBrowsing Security (185.228.168.10) - blocks phishing + malware + mixed
+///   - Adult: CleanBrowsing Family (185.228.168.168) - blocks adult + mixed content
+///   - Social: AdGuard Default (94.140.14.14) - blocks ads/trackers (social tracking)
+///
+/// Priority (highest wins when multiple are on):
+///   adult > gambling > ads/trackers/social > malware
 pub fn blocker_dns(
     block_ads: bool,
     block_trackers: bool,
     block_malware: bool,
+    block_gambling: bool,
+    block_social: bool,
     block_adult: bool,
 ) -> Option<String> {
-    if !block_ads && !block_trackers && !block_malware && !block_adult {
+    if !block_ads
+        && !block_trackers
+        && !block_malware
+        && !block_gambling
+        && !block_social
+        && !block_adult
+    {
         return None;
     }
 
-    // Adult content blocking requires the Family protection server
     if block_adult {
-        return Some("94.140.14.15".to_string());
+        return Some("185.228.168.168".to_string());
     }
 
-    // Any other combination uses the default AdGuard DNS
-    Some("94.140.14.14".to_string())
+    if block_gambling {
+        return Some("185.228.168.10".to_string());
+    }
+
+    if block_ads || block_trackers || block_social {
+        return Some("94.140.14.14".to_string());
+    }
+
+    if block_malware {
+        return Some("9.9.9.9".to_string());
+    }
+
+    None
 }
 
 pub fn check_leak() -> Result<Vec<String>, String> {

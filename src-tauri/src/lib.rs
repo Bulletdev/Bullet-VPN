@@ -156,7 +156,7 @@ fn check_connectivity(host: String, port: u16) -> Result<String, String> {
 // ── VPN commands ────────────────────────────────────────────────────
 
 #[tauri::command]
-fn connect(state: State<AppState>, profile_id: String, _allow_lan: bool) -> Result<(), String> {
+fn connect(state: State<AppState>, profile_id: String, allow_lan: bool) -> Result<(), String> {
     let profile = {
         let store = state.store.lock().map_err(|e| e.to_string())?;
         store
@@ -183,6 +183,47 @@ fn connect(state: State<AppState>, profile_id: String, _allow_lan: bool) -> Resu
     {
         let mut ap = state.active_profile_id.lock().map_err(|e| e.to_string())?;
         *ap = Some(profile_id.clone());
+    }
+
+    // Apply kill switch with LAN sharing preference
+    {
+        let iface = match profile.vpn_type {
+            VpnType::Wireguard => format!("bvpn-{}", &profile.id[..8]),
+            VpnType::Openvpn => "tun0".to_string(),
+        };
+        let endpoint_ip = profile.endpoint.split(':').next().unwrap_or("").to_string();
+        if let Err(e) = killswitch::enable(&iface, &endpoint_ip, allow_lan) {
+            eprintln!("[KS] failed to enable kill switch: {}", e);
+        }
+    }
+
+    // Apply DNS protection - use content blocker DNS if any are enabled, otherwise profile DNS
+    let blocker = {
+        let ads = state.db.get_setting("block_ads").as_deref() == Some("true");
+        let trackers = state.db.get_setting("block_trackers").as_deref() == Some("true");
+        let malware = state.db.get_setting("block_malware").as_deref() == Some("true");
+        let gambling = state.db.get_setting("block_gambling").as_deref() == Some("true");
+        let social = state.db.get_setting("block_social").as_deref() == Some("true");
+        let adult = state.db.get_setting("block_adult").as_deref() == Some("true");
+        dns::blocker_dns(ads, trackers, malware, gambling, social, adult)
+    };
+    let dns_server = blocker.unwrap_or_else(|| {
+        if profile.dns.is_empty() {
+            "1.1.1.1".to_string()
+        } else {
+            profile.dns.clone()
+        }
+    });
+    if let Err(e) = dns::protect(&dns_server) {
+        eprintln!("[DNS] failed to enable DNS protection: {}", e);
+    }
+
+    // Apply lockdown mode if enabled in settings
+    if state.db.get_setting("lockdown_mode").as_deref() == Some("true") {
+        let ld_allow_lan = state.db.get_setting("allow_lan").as_deref() != Some("false");
+        if let Err(e) = lockdown::enable(ld_allow_lan) {
+            eprintln!("[LOCKDOWN] failed to enable: {}", e);
+        }
     }
 
     // Auto-start SSH tunnels linked to this profile
@@ -411,11 +452,15 @@ fn get_blocker_dns(state: State<AppState>) -> Result<Option<String>, String> {
     let block_ads = state.db.get_setting("block_ads").as_deref() == Some("true");
     let block_trackers = state.db.get_setting("block_trackers").as_deref() == Some("true");
     let block_malware = state.db.get_setting("block_malware").as_deref() == Some("true");
+    let block_gambling = state.db.get_setting("block_gambling").as_deref() == Some("true");
+    let block_social = state.db.get_setting("block_social").as_deref() == Some("true");
     let block_adult = state.db.get_setting("block_adult").as_deref() == Some("true");
     Ok(dns::blocker_dns(
         block_ads,
         block_trackers,
         block_malware,
+        block_gambling,
+        block_social,
         block_adult,
     ))
 }
@@ -426,6 +471,8 @@ fn save_blocker_settings(
     block_ads: bool,
     block_trackers: bool,
     block_malware: bool,
+    block_gambling: bool,
+    block_social: bool,
     block_adult: bool,
 ) -> Result<(), String> {
     state
@@ -439,6 +486,13 @@ fn save_blocker_settings(
         "block_malware",
         if block_malware { "true" } else { "false" },
     )?;
+    state.db.set_setting(
+        "block_gambling",
+        if block_gambling { "true" } else { "false" },
+    )?;
+    state
+        .db
+        .set_setting("block_social", if block_social { "true" } else { "false" })?;
     state
         .db
         .set_setting("block_adult", if block_adult { "true" } else { "false" })?;

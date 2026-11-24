@@ -12,4 +12,21 @@
   [data-theme="light"] body {
     @apply bg-neutral-50 text-neutral-900;
   }
+
+  select,
+  select option {
+    @apply bg-neutral-800 text-neutral-200;
+  }
+
+  [data-theme="light"] select,
+  [data-theme="light"] select option {
+    @apply bg-neutral-100 text-neutral-800;
+  }
+
+  select {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }

@@ -1410,8 +1410,8 @@ function App() {
                     ) : (
                       <>
                         <div className="relative">
-                          <select value={selectedProfile ?? ""} onChange={(e) => setSelectedProfile(e.target.value)} disabled={tunnelState === "connected" || tunnelState === "connecting"} className={`w-full rounded px-3 py-2 text-sm appearance-none pr-8 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-bullet-500 ${inputCls}`}>
-                            {profiles.map((p) => (<option key={p.id} value={p.id}>[{p.vpn_type === "openvpn" ? "OVPN" : "WG"}] {p.name} -- {p.endpoint}</option>))}
+                          <select value={selectedProfile ?? ""} onChange={(e) => setSelectedProfile(e.target.value)} disabled={tunnelState === "connected" || tunnelState === "connecting"} className={`w-full rounded px-3 py-2 text-sm appearance-none pr-8 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-bullet-500 truncate ${inputCls}`}>
+                            {profiles.map((p) => (<option key={p.id} value={p.id}>[{p.vpn_type === "openvpn" ? "OVPN" : "WG"}] {p.name}</option>))}
                           </select>
                           <ChevronDown className={`absolute right-2 top-2.5 w-4 h-4 pointer-events-none ${subtleCls}`} />
                         </div>
@@ -1749,7 +1749,18 @@ function App() {
                           const next = isOn ? "false" : "true";
                           try {
                             await invoke("set_setting", { key, value: next });
-                            setSettings((prev) => ({ ...prev, [key]: next }));
+                            const updated = { ...settings, [key]: next };
+                            setSettings(updated);
+                            if (tunnelState === "connected") {
+                              const dns = await invoke<string | null>("get_blocker_dns");
+                              if (dns) {
+                                await invoke("enable_dns_protection", { server: dns });
+                                addLog(`[DNS] Content blocker DNS: ${dns}`);
+                              } else {
+                                await invoke("disable_dns_protection");
+                                addLog("[DNS] Content blockers disabled, using profile DNS");
+                              }
+                            }
                           } catch { /* ignore */ }
                         }} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 transition-colors text-left ${isDark ? "bg-neutral-800 hover:bg-neutral-750" : "bg-neutral-100 hover:bg-neutral-200"}`}>
                           <div className="flex-1 min-w-0">
