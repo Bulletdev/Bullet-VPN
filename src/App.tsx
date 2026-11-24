@@ -1425,7 +1425,11 @@ function App() {
                       <>
                         <div className="relative">
                           <select value={selectedProfile ?? ""} onChange={(e) => setSelectedProfile(e.target.value)} disabled={tunnelState === "connected" || tunnelState === "connecting"} className={`w-full rounded px-3 py-2 text-sm appearance-none pr-8 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-bullet-500 truncate ${inputCls}`}>
-                            {profiles.map((p) => (<option key={p.id} value={p.id}>[{p.vpn_type === "openvpn" ? "OVPN" : "WG"}] {p.name}</option>))}
+                            {profiles.map((p) => {
+                              const tag = p.vpn_type === "openvpn" ? "OVPN" : "WG";
+                              const name = p.name.length > 28 ? p.name.slice(0, 28) + "..." : p.name;
+                              return <option key={p.id} value={p.id}>[{tag}] {name}</option>;
+                            })}
                           </select>
                           <ChevronDown className={`absolute right-2 top-2.5 w-4 h-4 pointer-events-none ${subtleCls}`} />
                         </div>
@@ -1579,15 +1583,13 @@ function App() {
                           return (
                             <div key={tun.id} className={`flex items-center gap-2 rounded-lg px-3 py-2 ${isDark ? "bg-neutral-800" : "bg-neutral-100"}`}>
                               <div className={`w-2 h-2 rounded-full ${running ? "bg-bullet-500" : "bg-neutral-600"}`} />
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5">
-                                  <p className={`text-sm truncate ${isDark ? "text-neutral-200" : "text-neutral-800"}`}>[{typeLabel}] {tun.name}</p>
-                                  {tun.profile_id && profiles.find((p) => p.id === tun.profile_id) && (
-                                    <span className="text-[9px] bg-bullet-600/20 text-bullet-400 px-1.5 rounded">
-                                      {profiles.find((p) => p.id === tun.profile_id)?.name}
-                                    </span>
-                                  )}
-                                </div>
+                              <div className="flex-1 min-w-0 overflow-hidden">
+                                <p className={`text-sm truncate ${isDark ? "text-neutral-200" : "text-neutral-800"}`}>[{typeLabel}] {tun.name}</p>
+                                {tun.profile_id && profiles.find((p) => p.id === tun.profile_id) && (
+                                  <span className="text-[9px] bg-bullet-600/20 text-bullet-400 px-1.5 rounded inline-block mt-0.5">
+                                    {profiles.find((p) => p.id === tun.profile_id)?.name}
+                                  </span>
+                                )}
                                 <p className={`text-[10px] font-mono truncate ${subtleCls}`}>{tun.ssh_user}@{tun.ssh_host} {portInfo}</p>
                               </div>
                               <button onClick={() => running ? stopSshTunnel(tun.id) : startSshTunnel(tun.id)} className={`p-1.5 rounded transition-colors ${running ? "text-red-400 hover:bg-red-950" : "text-bullet-400 hover:bg-bullet-950"}`} title={running ? t("stop") : t("start")}>

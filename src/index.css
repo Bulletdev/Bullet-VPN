@@ -12,21 +12,37 @@
   [data-theme="light"] body {
     @apply bg-neutral-50 text-neutral-900;
   }
+}
 
-  select,
-  select option {
-    @apply bg-neutral-800 text-neutral-200;
-  }
+/* Native select/option styling - must be outside @layer to override GTK */
+select,
+select option {
+  background-color: #262626 !important;
+  color: #e5e5e5 !important;
+  color-scheme: dark;
+}
 
-  [data-theme="light"] select,
-  [data-theme="light"] select option {
-    @apply bg-neutral-100 text-neutral-800;
-  }
+[data-theme="light"] select,
+[data-theme="light"] select option {
+  background-color: #f5f5f5 !important;
+  color: #262626 !important;
+  color-scheme: light;
+}
 
-  select {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+select {
+  max-width: 100% !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Force option text to be readable in GTK dropdown popup */
+option:checked {
+  background-color: #7c3aed !important;
+  color: #fff !important;
+}
+
+[data-theme="light"] option:checked {
+  background-color: #7c3aed !important;
+  color: #fff !important;
 }
