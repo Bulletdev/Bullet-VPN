@@ -46,3 +46,28 @@ option:checked {
   background-color: #7c3aed !important;
   color: #fff !important;
 }
+
+@keyframes splash-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.08); opacity: 0.6; }
+}
+
+@keyframes splash-exit {
+  0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+  100% { transform: translate(150px, -200px) rotate(20deg) scale(0.1); opacity: 0; }
+}
+
+@keyframes splash-text-exit {
+  0% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(-40px); opacity: 0; }
+}
+
+@keyframes splash-fade-exit {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes splash-dots {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}

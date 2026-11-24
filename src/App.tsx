@@ -545,7 +545,10 @@ function App() {
   }, [theme]);
 
   // Boot state
-  const [ready, setReady] = useState(false);
+  const [splashPhase, setSplashPhase] = useState<"loading" | "exiting" | "done">("loading");
+  const [splashText, setSplashText] = useState("");
+  const dataLoadedRef = useRef(false);
+  const minTimeRef = useRef(false);
 
   // VPN state
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -696,8 +699,40 @@ function App() {
       invoke<boolean>("killswitch_status").then(setKillswitchOn).catch(() => {}),
       invoke<boolean>("dns_protection_status").then(setDnsProtOn).catch(() => {}),
       invoke<boolean>("connection_guard_status").then(setConnGuardOn).catch(() => {}),
-    ]).finally(() => setReady(true));
+    ]).finally(() => {
+      dataLoadedRef.current = true;
+      if (minTimeRef.current) setSplashPhase("exiting");
+    });
   }, [loadProfiles, loadSshTunnels, loadSettings]);
+
+  useEffect(() => {
+    const minTimer = setTimeout(() => {
+      minTimeRef.current = true;
+      if (dataLoadedRef.current) setSplashPhase("exiting");
+    }, 1500);
+    const maxTimer = setTimeout(() => {
+      setSplashPhase("exiting");
+    }, 3000);
+    return () => { clearTimeout(minTimer); clearTimeout(maxTimer); };
+  }, []);
+
+  useEffect(() => {
+    if (splashPhase !== "loading") return;
+    const full = "Initializing...";
+    let i = 0;
+    const timer = setInterval(() => {
+      i++;
+      if (i > full.length) { i = 0; setSplashText(""); }
+      else setSplashText(full.slice(0, i));
+    }, 80);
+    return () => clearInterval(timer);
+  }, [splashPhase]);
+
+  useEffect(() => {
+    if (splashPhase !== "exiting") return;
+    const timer = setTimeout(() => setSplashPhase("done"), 900);
+    return () => clearTimeout(timer);
+  }, [splashPhase]);
 
   useEffect(() => {
     const interval = setInterval(checkStatus, 2000);
@@ -707,7 +742,7 @@ function App() {
   useEffect(() => {
     if (profiles.length === 0) return;
     pingProfiles();
-    const interval = setInterval(pingProfiles, 30000);
+    const interval = setInterval(pingProfiles, 10000);
     return () => clearInterval(interval);
   }, [profiles, pingProfiles]);
 
@@ -1256,12 +1291,43 @@ function App() {
 
   // ── Render ──────────────────────────────────────────────────────
 
-  if (!ready) {
+  const logoRef = useRef<HTMLImageElement>(null);
+  const titleRef = useRef<HTMLSpanElement>(null);
+  const statusRef = useRef<HTMLSpanElement>(null);
+  const pulseRef = useRef<Animation | null>(null);
+
+  useEffect(() => {
+    if (splashPhase !== "loading" || !logoRef.current) return;
+    pulseRef.current = logoRef.current.animate(
+      [{ transform: "scale(1)", opacity: 1 }, { transform: "scale(1.08)", opacity: 0.6 }, { transform: "scale(1)", opacity: 1 }],
+      { duration: 1400, iterations: Infinity, easing: "ease-in-out" },
+    );
+    return () => { pulseRef.current?.cancel(); pulseRef.current = null; };
+  }, [splashPhase]);
+
+  useEffect(() => {
+    if (splashPhase !== "exiting") return;
+    pulseRef.current?.cancel();
+    if (logoRef.current) {
+      logoRef.current.animate(
+        [{ transform: "translate(0,0) rotate(0) scale(1)", opacity: 1 }, { transform: "translate(150px,-200px) rotate(20deg) scale(0.1)", opacity: 0 }],
+        { duration: 800, easing: "cubic-bezier(0.4,0,0.2,1)", fill: "forwards" },
+      );
+    }
+    if (titleRef.current) {
+      titleRef.current.animate([{ transform: "translateY(0)", opacity: 1 }, { transform: "translateY(-40px)", opacity: 0 }], { duration: 600, easing: "ease-out", fill: "forwards" });
+    }
+    if (statusRef.current) {
+      statusRef.current.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 500, easing: "ease-out", fill: "forwards" });
+    }
+  }, [splashPhase]);
+
+  if (splashPhase !== "done") {
     return (
-      <div className={`flex flex-col items-center justify-center h-screen gap-3 ${isDark ? "bg-neutral-950" : "bg-neutral-50"}`}>
-        <img src="/logo.png" alt="Bullet VPN" className="w-16 h-16 animate-pulse" />
-        <span className={`text-sm font-semibold ${isDark ? "text-neutral-400" : "text-neutral-600"}`}>Bullet VPN</span>
-        <span className={`text-xs ${isDark ? "text-neutral-600" : "text-neutral-500"}`}>Initializing...</span>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", gap: 12, background: isDark ? "#0a0a0a" : "#fafafa" }}>
+        <img ref={logoRef} src="/logo.png" alt="Bullet VPN" style={{ width: 80, height: 80 }} />
+        <span ref={titleRef} style={{ fontSize: 14, fontWeight: 600, color: isDark ? "#a3a3a3" : "#525252" }}>Bullet VPN</span>
+        <span ref={statusRef} style={{ fontSize: 12, color: isDark ? "#525252" : "#737373", fontFamily: "monospace", minWidth: 110, textAlign: "center" }}>{splashText}<span style={{ opacity: splashPhase === "loading" ? 1 : 0 }}>|</span></span>
       </div>
     );
   }

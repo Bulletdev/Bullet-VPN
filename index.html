@@ -6,27 +6,30 @@
     <title>Bullet VPN</title>
     <style>
       body { margin: 0; background: #0a0a0a; }
-      #splash {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 100vh;
-        gap: 12px;
-      }
-      #splash img { width: 64px; height: 64px; animation: pulse 1.5s ease-in-out infinite; }
-      #splash .name { color: #a3a3a3; font: 600 14px/1 system-ui, sans-serif; }
-      #splash .status { color: #525252; font: 400 12px/1 system-ui, sans-serif; }
-      @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+      @keyframes sp-pulse { 0%,100% { transform:scale(1); opacity:1; } 50% { transform:scale(1.08); opacity:0.6; } }
+      @keyframes sp-exit { 0% { transform:translate(0,0) rotate(0) scale(1); opacity:1; } 100% { transform:translate(150px,-200px) rotate(20deg) scale(0.1); opacity:0; } }
+      @keyframes sp-text { 0% { transform:translateY(0); opacity:1; } 100% { transform:translateY(-40px); opacity:0; } }
+      @keyframes sp-dots { 0%,100% { opacity:0.4; } 50% { opacity:1; } }
+      @keyframes sp-fade { 0% { opacity:1; } 100% { opacity:0; } }
+      .pre-splash { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; gap:12px; }
+      .pre-splash img { width:80px; height:80px; animation: sp-pulse 1.4s ease-in-out infinite; }
+      .pre-splash .t1 { color:#a3a3a3; font:600 14px/1 system-ui,sans-serif; }
+      .pre-splash .t2 { color:#525252; font:400 12px/1 monospace,system-ui,sans-serif; min-width:110px; text-align:center; }
     </style>
   </head>
-  <body class="bg-neutral-950 text-neutral-100">
-    <div id="splash">
-      <img src="/logo.png" alt="Bullet VPN" />
-      <span class="name">Bullet VPN</span>
-      <span class="status">Initializing...</span>
+  <body>
+    <div id="root">
+      <div class="pre-splash">
+        <img src="/logo.png" alt="Bullet VPN" />
+        <span class="t1">Bullet VPN</span>
+        <span class="t2" id="pre-tw"></span>
+      </div>
     </div>
-    <div id="root"></div>
+    <script>
+      (function(){var f="Initializing...",el=document.getElementById("pre-tw"),i=0;
+        setInterval(function(){i++;if(i>f.length)i=0;el.textContent=f.slice(0,i)+"|";},80);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

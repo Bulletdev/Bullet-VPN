@@ -64,11 +64,15 @@ pub fn ping_host(host: &str) -> Result<u32, String> {
     use std::net::{TcpStream, ToSocketAddrs};
     use std::time::{Duration, Instant};
 
-    let addr_str = if host.contains(':') {
-        host.to_string()
+    let clean = host.trim();
+    let hostname = if clean.starts_with('[') {
+        clean.split(']').next().unwrap_or(clean).trim_start_matches('[')
+    } else if clean.matches(':').count() == 1 {
+        clean.split(':').next().unwrap_or(clean)
     } else {
-        format!("{}:443", host)
+        clean
     };
+    let addr_str = format!("{}:443", hostname);
 
     let addr = addr_str
         .to_socket_addrs()
