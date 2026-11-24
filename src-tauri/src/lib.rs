@@ -231,8 +231,8 @@ fn connect(state: State<AppState>, profile_id: String, _allow_lan: bool) -> Resu
     Ok(())
 }
 
-fn auto_start_tunnels(state: &AppState, profile_id: &str) {
-    let tunnels = state.db.list_ssh_tunnels_by_profile(profile_id);
+fn auto_start_tunnels(state: &AppState, _profile_id: &str) {
+    let tunnels = state.db.list_ssh_tunnels();
     for tunnel in &tunnels {
         if ssh::is_running(&tunnel.id) {
             continue;
@@ -243,8 +243,8 @@ fn auto_start_tunnels(state: &AppState, profile_id: &str) {
     }
 }
 
-fn auto_stop_tunnels(state: &AppState, profile_id: &str) {
-    let tunnels = state.db.list_ssh_tunnels_by_profile(profile_id);
+fn auto_stop_tunnels(state: &AppState, _profile_id: &str) {
+    let tunnels = state.db.list_ssh_tunnels();
     for tunnel in &tunnels {
         if !ssh::is_running(&tunnel.id) {
             continue;

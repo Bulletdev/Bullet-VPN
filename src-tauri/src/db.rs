@@ -426,6 +426,7 @@ impl Database {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn list_ssh_tunnels_by_profile(&self, profile_id: &str) -> Vec<SshTunnel> {
         let conn = self.conn();
         let mut stmt = match conn.prepare(
