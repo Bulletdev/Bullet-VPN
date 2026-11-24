@@ -740,7 +740,8 @@ function App() {
     }, 30000);
 
     try {
-      await invoke("connect", { profileId: selectedProfile });
+      const lanAllowed = settings.allow_lan !== "false";
+      await invoke("connect", { profileId: selectedProfile, allowLan: lanAllowed });
       if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
       setTunnelState("connected");
       addLog(t("logConnected"));
