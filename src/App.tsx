@@ -37,6 +37,12 @@ interface Profile {
   allowed_ips: string;
   dns: string;
   ovpn_config_path: string;
+  mtu: number | null;
+  obfuscation: "off" | "udp2tcp" | "shadowsocks" | "obfs4";
+  multihop_enabled: boolean;
+  multihop_entry_id: string;
+  preshared_key: string;
+  daita: boolean;
 }
 
 interface ConnectionStatus {
@@ -59,6 +65,7 @@ interface SshTunnel {
   ssh_host: string;
   ssh_user: string;
   ssh_key: string;
+  profile_id: string;
 }
 
 type TunnelState =
@@ -227,6 +234,38 @@ const translations: Record<Locale, Record<string, string>> = {
     updateDone: "Atualizado! Reinicie o app.",
     logUpdateSuccess: "Atualizado com sucesso! Reinicie o app.",
     logUpdateFailed: "Falha na atualizacao: {error}",
+    autoConnect: "Conectar automaticamente ao iniciar",
+    startMinimized: "Iniciar minimizado",
+    defaultProfile: "Perfil padrao",
+    lockdownMode: "Modo Lockdown",
+    lockdownWarning: "O Modo Lockdown bloqueia TODO o trafego de rede ate que uma VPN esteja conectada. Tem certeza?",
+    allowLan: "Permitir LAN",
+    blockAds: "Bloquear Anuncios",
+    blockTrackers: "Bloquear Rastreadores",
+    blockMalware: "Bloquear Malware",
+    blockGambling: "Bloquear Apostas",
+    blockSocial: "Bloquear Redes Sociais",
+    blockAdult: "Bloquear Adulto",
+    contentBlockers: "Bloqueadores de Conteudo",
+    generateReport: "Gerar Relatorio",
+    copyToClipboard: "Copiar",
+    diagnosticReport: "Relatorio de Diagnostico",
+    mtu: "MTU",
+    obfuscation: "Ofuscacao",
+    multihop: "Multi-hop",
+    entryServer: "Servidor de Entrada",
+    linkToProfile: "Vincular a Perfil VPN",
+    noProfile: "Nenhum (manual)",
+    latency: "Latencia",
+    offline: "Offline",
+    checking: "Verificando...",
+    diagnostics: "Diagnosticos",
+    logLockdownOn: "Modo lockdown ativado.",
+    logLockdownOff: "Modo lockdown desativado.",
+    presharedKey: "PresharedKey (PSK)",
+    presharedKeyHint: "Base64 - quantum-resistant",
+    daitaLabel: "DAITA (anti traffic analysis)",
+    daitaHint: "Envia trafego de preenchimento para dificultar analise de padroes. Consome ~5-15% a mais de banda.",
   },
   "en-US": {
     disconnected: "Disconnected",
@@ -380,6 +419,38 @@ const translations: Record<Locale, Record<string, string>> = {
     updateDone: "Updated! Restart the app.",
     logUpdateSuccess: "Updated successfully! Restart the app.",
     logUpdateFailed: "Update failed: {error}",
+    autoConnect: "Auto-connect on startup",
+    startMinimized: "Start minimized",
+    defaultProfile: "Default profile",
+    lockdownMode: "Lockdown Mode",
+    lockdownWarning: "Lockdown Mode blocks ALL network traffic until a VPN is connected. Are you sure?",
+    allowLan: "Allow LAN",
+    blockAds: "Block Ads",
+    blockTrackers: "Block Trackers",
+    blockMalware: "Block Malware",
+    blockGambling: "Block Gambling",
+    blockSocial: "Block Social",
+    blockAdult: "Block Adult",
+    contentBlockers: "Content Blockers",
+    generateReport: "Generate Report",
+    copyToClipboard: "Copy to Clipboard",
+    diagnosticReport: "Diagnostic Report",
+    mtu: "MTU",
+    obfuscation: "Obfuscation",
+    multihop: "Multi-hop",
+    entryServer: "Entry Server",
+    linkToProfile: "Link to VPN Profile",
+    noProfile: "None (manual)",
+    latency: "Latency",
+    offline: "Offline",
+    checking: "Checking...",
+    diagnostics: "Diagnostics",
+    logLockdownOn: "Lockdown mode enabled.",
+    logLockdownOff: "Lockdown mode disabled.",
+    presharedKey: "PresharedKey (PSK)",
+    presharedKeyHint: "Base64 - quantum-resistant",
+    daitaLabel: "DAITA (anti traffic analysis)",
+    daitaHint: "Sends padding traffic to disrupt pattern analysis. Uses ~5-15% extra bandwidth.",
   },
 };
 
@@ -396,6 +467,12 @@ const EMPTY_PROFILE: Omit<Profile, "id"> = {
   allowed_ips: "",
   dns: "1.1.1.1",
   ovpn_config_path: "",
+  mtu: null,
+  obfuscation: "off",
+  multihop_enabled: false,
+  multihop_entry_id: "",
+  preshared_key: "",
+  daita: false,
 };
 
 const EMPTY_SSH: Omit<SshTunnel, "id"> = {
@@ -407,6 +484,7 @@ const EMPTY_SSH: Omit<SshTunnel, "id"> = {
   ssh_host: "",
   ssh_user: "root",
   ssh_key: "~/.ssh/id_ed25519",
+  profile_id: "",
 };
 
 // ── Theme & i18n contexts ──────────────────────────────────────────
@@ -516,6 +594,11 @@ function App() {
   const [updating, setUpdating] = useState(false);
   const [updateStep, setUpdateStep] = useState("");
 
+  // Settings (persisted via backend)
+  const [settings, setSettings] = useState<Record<string, string>>({});
+  const [diagnosticReport, setDiagnosticReport] = useState<string | null>(null);
+  const [profileLatency, setProfileLatency] = useState<Record<string, number | null>>({});
+
   // ── Helpers ─────────────────────────────────────────────────────
 
   const addLog = useCallback((msg: string) => {
@@ -549,6 +632,33 @@ function App() {
     } catch { /* ignore */ }
   }, []);
 
+  const SETTING_KEYS = [
+    "auto_connect", "default_profile_id", "start_minimized",
+    "allow_lan", "lockdown_mode",
+    "block_ads", "block_trackers", "block_malware",
+    "block_gambling", "block_social", "block_adult",
+  ];
+
+  const loadSettings = useCallback(async () => {
+    for (const key of SETTING_KEYS) {
+      try {
+        const val = await invoke<string | null>("get_setting", { key });
+        if (val !== null) setSettings((prev) => ({ ...prev, [key]: val }));
+      } catch { /* ignore */ }
+    }
+  }, []);
+
+  const pingProfiles = useCallback(async () => {
+    for (const p of profiles) {
+      try {
+        const ms = await invoke<number>("ping_profile_endpoint", { endpoint: p.endpoint });
+        setProfileLatency((prev) => ({ ...prev, [p.id]: ms }));
+      } catch {
+        setProfileLatency((prev) => ({ ...prev, [p.id]: null }));
+      }
+    }
+  }, [profiles]);
+
   const checkStatus = useCallback(async () => {
     try {
       const result = await invoke<ConnectionStatus | null>("get_status");
@@ -579,16 +689,24 @@ function App() {
   useEffect(() => {
     loadProfiles();
     loadSshTunnels();
+    loadSettings();
     invoke<boolean>("check_permissions").then(setPermInstalled).catch(() => {});
     invoke<boolean>("killswitch_status").then(setKillswitchOn).catch(() => {});
     invoke<boolean>("dns_protection_status").then(setDnsProtOn).catch(() => {});
     invoke<boolean>("connection_guard_status").then(setConnGuardOn).catch(() => {});
-  }, [loadProfiles, loadSshTunnels]);
+  }, [loadProfiles, loadSshTunnels, loadSettings]);
 
   useEffect(() => {
     const interval = setInterval(checkStatus, 2000);
     return () => clearInterval(interval);
   }, [checkStatus]);
+
+  useEffect(() => {
+    if (profiles.length === 0) return;
+    pingProfiles();
+    const interval = setInterval(pingProfiles, 30000);
+    return () => clearInterval(interval);
+  }, [profiles, pingProfiles]);
 
   useEffect(() => {
     const unlisten = listen<string>("update-progress", (e) => {
@@ -688,6 +806,12 @@ function App() {
       allowed_ips: form.allowed_ips,
       dns: form.dns || "1.1.1.1",
       ovpn_config_path: "",
+      mtu: form.mtu,
+      obfuscation: form.obfuscation,
+      multihop_enabled: form.multihop_enabled,
+      multihop_entry_id: form.multihop_entry_id,
+      preshared_key: form.preshared_key,
+      daita: form.daita,
     };
     try {
       await invoke("add_profile", { profile });
@@ -721,6 +845,12 @@ function App() {
         allowed_ips: "",
         dns: "",
         ovpn_config_path: "",
+        mtu: null,
+        obfuscation: "off",
+        multihop_enabled: false,
+        multihop_entry_id: "",
+        preshared_key: "",
+        daita: false,
       };
       try {
         await invoke("add_profile", { profile });
@@ -754,6 +884,7 @@ function App() {
     const pubkey = parsed["[Peer]PublicKey"] || "";
     const ep = parsed["[Peer]Endpoint"] || "";
     const allowedIPs = parsed["[Peer]AllowedIPs"] || "0.0.0.0/0";
+    const psk = parsed["[Peer]PresharedKey"] || "";
 
     if (!privateKey || !pubkey || !ep) {
       addLog(t("logConfInvalid"));
@@ -772,6 +903,12 @@ function App() {
       allowed_ips: allowedIPs,
       dns: confDns,
       ovpn_config_path: "",
+      mtu: null,
+      obfuscation: "off",
+      multihop_enabled: false,
+      multihop_entry_id: "",
+      preshared_key: psk,
+      daita: false,
     };
     try {
       await invoke("add_profile", { profile });
@@ -1175,6 +1312,45 @@ function App() {
                       <Field label={t("address")} placeholder="10.0.0.2/32" value={form.address} onChange={(v) => setForm({ ...form, address: v })} />
                       <Field label={t("allowedIps")} placeholder="0.0.0.0/0" value={form.allowed_ips} onChange={(v) => setForm({ ...form, allowed_ips: v })} />
                       <Field label={t("dns")} placeholder="1.1.1.1" value={form.dns} onChange={(v) => setForm({ ...form, dns: v })} />
+                      <Field label={t("mtu")} placeholder="auto (1420)" value={form.mtu !== null ? String(form.mtu) : ""} onChange={(v) => setForm({ ...form, mtu: v ? Number(v) || null : null })} />
+                      <div>
+                        <label className={`block text-xs ${subtleCls} mb-0.5`}>{t("obfuscation")}</label>
+                        <select value={form.obfuscation} onChange={(e) => setForm({ ...form, obfuscation: e.target.value as Profile["obfuscation"] })} className={`w-full rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-bullet-500 ${inputCls}`}>
+                          <option value="off">Off</option>
+                          <option value="udp2tcp">UDP2TCP</option>
+                          <option value="shadowsocks">Shadowsocks</option>
+                          <option value="obfs4">obfs4</option>
+                        </select>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button type="button" onClick={() => setForm({ ...form, multihop_enabled: !form.multihop_enabled })} className={`flex items-center gap-2 text-xs ${isDark ? "text-neutral-300" : "text-neutral-700"}`}>
+                          <div className={`w-8 h-4 rounded-full relative transition-colors ${form.multihop_enabled ? "bg-bullet-600" : isDark ? "bg-neutral-700" : "bg-neutral-300"}`}>
+                            <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${form.multihop_enabled ? "translate-x-4" : "translate-x-0.5"}`} />
+                          </div>
+                          {t("multihop")}
+                        </button>
+                      </div>
+                      {form.multihop_enabled && (
+                        <div>
+                          <label className={`block text-xs ${subtleCls} mb-0.5`}>{t("entryServer")}</label>
+                          <select value={form.multihop_entry_id} onChange={(e) => setForm({ ...form, multihop_entry_id: e.target.value })} className={`w-full rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-bullet-500 ${inputCls}`}>
+                            <option value="">--</option>
+                            {profiles.filter((p) => p.id !== selectedProfile).map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+                          </select>
+                        </div>
+                      )}
+                      <Field label={t("presharedKey")} placeholder={t("presharedKeyHint")} value={form.preshared_key} onChange={(v) => setForm({ ...form, preshared_key: v })} type="password" />
+                      <div className="flex items-center gap-3">
+                        <button type="button" onClick={() => setForm({ ...form, daita: !form.daita })} className={`flex items-center gap-2 text-xs ${isDark ? "text-neutral-300" : "text-neutral-700"}`}>
+                          <div className={`w-8 h-4 rounded-full relative transition-colors ${form.daita ? "bg-bullet-600" : isDark ? "bg-neutral-700" : "bg-neutral-300"}`}>
+                            <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${form.daita ? "translate-x-4" : "translate-x-0.5"}`} />
+                          </div>
+                          {t("daitaLabel")}
+                        </button>
+                      </div>
+                      {form.daita && (
+                        <p className={`text-[10px] ${subtleCls}`}>{t("daitaHint")}</p>
+                      )}
                       {/* Auto-provisioning */}
                       <button type="button" onClick={() => { setShowProvisioning(!showProvisioning); if (!showProvisioning) loadSshKeys(); }} className={`w-full flex items-center gap-2 py-1.5 px-3 text-xs border rounded transition-colors ${isDark ? "bg-neutral-800/50 hover:bg-neutral-800 text-neutral-400 border-neutral-700" : "bg-neutral-100/50 hover:bg-neutral-100 text-neutral-600 border-neutral-300"}`}>
                         <ChevronRight className={`w-3 h-3 transition-transform ${showProvisioning ? "rotate-90" : ""}`} />
@@ -1232,12 +1408,27 @@ function App() {
                         {t("addProfilePrompt")}
                       </button>
                     ) : (
-                      <div className="relative">
-                        <select value={selectedProfile ?? ""} onChange={(e) => setSelectedProfile(e.target.value)} disabled={tunnelState === "connected" || tunnelState === "connecting"} className={`w-full rounded px-3 py-2 text-sm appearance-none pr-8 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-bullet-500 ${inputCls}`}>
-                          {profiles.map((p) => (<option key={p.id} value={p.id}>[{p.vpn_type === "openvpn" ? "OVPN" : "WG"}] {p.name} -- {p.endpoint}</option>))}
-                        </select>
-                        <ChevronDown className={`absolute right-2 top-2.5 w-4 h-4 pointer-events-none ${subtleCls}`} />
-                      </div>
+                      <>
+                        <div className="relative">
+                          <select value={selectedProfile ?? ""} onChange={(e) => setSelectedProfile(e.target.value)} disabled={tunnelState === "connected" || tunnelState === "connecting"} className={`w-full rounded px-3 py-2 text-sm appearance-none pr-8 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-bullet-500 ${inputCls}`}>
+                            {profiles.map((p) => (<option key={p.id} value={p.id}>[{p.vpn_type === "openvpn" ? "OVPN" : "WG"}] {p.name} -- {p.endpoint}</option>))}
+                          </select>
+                          <ChevronDown className={`absolute right-2 top-2.5 w-4 h-4 pointer-events-none ${subtleCls}`} />
+                        </div>
+                        {selectedProfile && (
+                          <p className={`text-[10px] mt-1 ${
+                            profileLatency[selectedProfile] === null || profileLatency[selectedProfile] === undefined
+                              ? "text-neutral-500"
+                              : (profileLatency[selectedProfile] as number) < 100
+                                ? "text-green-400"
+                                : (profileLatency[selectedProfile] as number) < 200
+                                  ? "text-yellow-400"
+                                  : "text-red-400"
+                          }`}>
+                            {t("latency")}: {profileLatency[selectedProfile] === null || profileLatency[selectedProfile] === undefined ? t("checking") : `${profileLatency[selectedProfile]}ms`}
+                          </p>
+                        )}
+                      </>
                     )}
                     {profiles.length > 0 && (
                       <button onClick={tunnelState === "connected" || tunnelState === "error" ? disconnectVpn : connectVpn} disabled={tunnelState === "connecting" || tunnelState === "disconnecting" || !selectedProfile} className={`mt-3 w-full py-3 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2 ${tunnelState === "connected" || tunnelState === "error" ? "bg-red-600 hover:bg-red-700 text-white" : "bg-bullet-600 hover:bg-bullet-700 text-white"} disabled:opacity-50 disabled:cursor-not-allowed`}>
@@ -1345,6 +1536,13 @@ function App() {
                       <Field label={t("sshHost")} placeholder="my-vps.com" value={sshForm.ssh_host} onChange={(v) => setSshForm({ ...sshForm, ssh_host: v })} />
                       <Field label={t("sshUser")} placeholder="root" value={sshForm.ssh_user} onChange={(v) => setSshForm({ ...sshForm, ssh_user: v })} />
                       <Field label={t("sshKey")} placeholder="~/.ssh/id_ed25519" value={sshForm.ssh_key} onChange={(v) => setSshForm({ ...sshForm, ssh_key: v })} />
+                      <div>
+                        <label className={`block text-xs ${subtleCls} mb-0.5`}>{t("linkToProfile")}</label>
+                        <select value={sshForm.profile_id} onChange={(e) => setSshForm({ ...sshForm, profile_id: e.target.value })} className={`w-full rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-bullet-500 ${inputCls}`}>
+                          <option value="">{t("noProfile")}</option>
+                          {profiles.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+                        </select>
+                      </div>
                     </div>
                     <GreenBtn onClick={addSshTunnel}>{t("saveTunnel")}</GreenBtn>
                   </div>
@@ -1368,7 +1566,14 @@ function App() {
                             <div key={tun.id} className={`flex items-center gap-2 rounded-lg px-3 py-2 ${isDark ? "bg-neutral-800" : "bg-neutral-100"}`}>
                               <div className={`w-2 h-2 rounded-full ${running ? "bg-bullet-500" : "bg-neutral-600"}`} />
                               <div className="flex-1 min-w-0">
-                                <p className={`text-sm truncate ${isDark ? "text-neutral-200" : "text-neutral-800"}`}>[{typeLabel}] {tun.name}</p>
+                                <div className="flex items-center gap-1.5">
+                                  <p className={`text-sm truncate ${isDark ? "text-neutral-200" : "text-neutral-800"}`}>[{typeLabel}] {tun.name}</p>
+                                  {tun.profile_id && profiles.find((p) => p.id === tun.profile_id) && (
+                                    <span className="text-[9px] bg-bullet-600/20 text-bullet-400 px-1.5 rounded">
+                                      {profiles.find((p) => p.id === tun.profile_id)?.name}
+                                    </span>
+                                  )}
+                                </div>
                                 <p className={`text-[10px] font-mono truncate ${subtleCls}`}>{tun.ssh_user}@{tun.ssh_host} {portInfo}</p>
                               </div>
                               <button onClick={() => running ? stopSshTunnel(tun.id) : startSshTunnel(tun.id)} className={`p-1.5 rounded transition-colors ${running ? "text-red-400 hover:bg-red-950" : "text-bullet-400 hover:bg-bullet-950"}`} title={running ? t("stop") : t("start")}>
@@ -1433,6 +1638,148 @@ function App() {
                       <option value="208.67.222.222">OpenDNS</option>
                     </select>
                   </div>
+                </div>
+                {/* Auto-connect */}
+                <div className={cardCls}>
+                  <h2 className={`text-sm font-medium ${headingCls} mb-3`}>{t("autoConnect")}</h2>
+                  <div className="space-y-2">
+                    <button onClick={async () => {
+                      const next = settings.auto_connect === "true" ? "false" : "true";
+                      try {
+                        await invoke("set_setting", { key: "auto_connect", value: next });
+                        setSettings((prev) => ({ ...prev, auto_connect: next }));
+                      } catch { /* ignore */ }
+                    }} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 transition-colors text-left ${isDark ? "bg-neutral-800 hover:bg-neutral-750" : "bg-neutral-100 hover:bg-neutral-200"}`}>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm ${isDark ? "text-neutral-200" : "text-neutral-800"}`}>{t("autoConnect")}</p>
+                      </div>
+                      <div className={`w-8 h-4 rounded-full relative transition-colors ${settings.auto_connect === "true" ? "bg-bullet-600" : isDark ? "bg-neutral-700" : "bg-neutral-300"}`}>
+                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${settings.auto_connect === "true" ? "translate-x-4" : "translate-x-0.5"}`} />
+                      </div>
+                    </button>
+                    {settings.auto_connect === "true" && (
+                      <div>
+                        <label className={`block text-xs ${subtleCls} mb-0.5`}>{t("defaultProfile")}</label>
+                        <select value={settings.default_profile_id || ""} onChange={async (e) => {
+                          try {
+                            await invoke("set_setting", { key: "default_profile_id", value: e.target.value });
+                            setSettings((prev) => ({ ...prev, default_profile_id: e.target.value }));
+                          } catch { /* ignore */ }
+                        }} className={`w-full rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-bullet-500 ${inputCls}`}>
+                          <option value="">--</option>
+                          {profiles.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+                        </select>
+                      </div>
+                    )}
+                    <button onClick={async () => {
+                      const next = settings.start_minimized === "true" ? "false" : "true";
+                      try {
+                        await invoke("set_setting", { key: "start_minimized", value: next });
+                        setSettings((prev) => ({ ...prev, start_minimized: next }));
+                      } catch { /* ignore */ }
+                    }} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 transition-colors text-left ${isDark ? "bg-neutral-800 hover:bg-neutral-750" : "bg-neutral-100 hover:bg-neutral-200"}`}>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm ${isDark ? "text-neutral-200" : "text-neutral-800"}`}>{t("startMinimized")}</p>
+                      </div>
+                      <div className={`w-8 h-4 rounded-full relative transition-colors ${settings.start_minimized === "true" ? "bg-bullet-600" : isDark ? "bg-neutral-700" : "bg-neutral-300"}`}>
+                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${settings.start_minimized === "true" ? "translate-x-4" : "translate-x-0.5"}`} />
+                      </div>
+                    </button>
+                  </div>
+                </div>
+                {/* Security settings */}
+                <div className={cardCls}>
+                  <h2 className={`text-sm font-medium ${headingCls} mb-3`}>{t("security")}</h2>
+                  <div className="space-y-2">
+                    <button onClick={async () => {
+                      if (settings.lockdown_mode !== "true") {
+                        if (!window.confirm(t("lockdownWarning"))) return;
+                        try {
+                          await invoke("enable_lockdown");
+                          setSettings((prev) => ({ ...prev, lockdown_mode: "true" }));
+                          addLog(t("logLockdownOn"));
+                        } catch (e) { addLog(t("logError", { error: String(e) })); }
+                      } else {
+                        try {
+                          await invoke("disable_lockdown");
+                          setSettings((prev) => ({ ...prev, lockdown_mode: "false" }));
+                          addLog(t("logLockdownOff"));
+                        } catch (e) { addLog(t("logError", { error: String(e) })); }
+                      }
+                    }} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 transition-colors text-left ${isDark ? "bg-neutral-800 hover:bg-neutral-750" : "bg-neutral-100 hover:bg-neutral-200"}`}>
+                      <div className={`${settings.lockdown_mode === "true" ? "text-red-400" : isDark ? "text-neutral-500" : "text-neutral-600"}`}><Lock className="w-3.5 h-3.5" /></div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm ${isDark ? "text-neutral-200" : "text-neutral-800"}`}>{t("lockdownMode")}</p>
+                      </div>
+                      <div className={`w-8 h-4 rounded-full relative transition-colors ${settings.lockdown_mode === "true" ? "bg-red-600" : isDark ? "bg-neutral-700" : "bg-neutral-300"}`}>
+                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${settings.lockdown_mode === "true" ? "translate-x-4" : "translate-x-0.5"}`} />
+                      </div>
+                    </button>
+                    <button onClick={async () => {
+                      const next = settings.allow_lan === "false" ? "true" : "false";
+                      try {
+                        await invoke("set_setting", { key: "allow_lan", value: next });
+                        setSettings((prev) => ({ ...prev, allow_lan: next }));
+                      } catch { /* ignore */ }
+                    }} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 transition-colors text-left ${isDark ? "bg-neutral-800 hover:bg-neutral-750" : "bg-neutral-100 hover:bg-neutral-200"}`}>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm ${isDark ? "text-neutral-200" : "text-neutral-800"}`}>{t("allowLan")}</p>
+                      </div>
+                      <div className={`w-8 h-4 rounded-full relative transition-colors ${settings.allow_lan !== "false" ? "bg-bullet-600" : isDark ? "bg-neutral-700" : "bg-neutral-300"}`}>
+                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${settings.allow_lan !== "false" ? "translate-x-4" : "translate-x-0.5"}`} />
+                      </div>
+                    </button>
+                  </div>
+                </div>
+                {/* Content Blockers */}
+                <div className={cardCls}>
+                  <h2 className={`text-sm font-medium ${headingCls} mb-3`}>{t("contentBlockers")}</h2>
+                  <div className="space-y-2">
+                    {([
+                      { key: "block_ads", label: "blockAds", defaultOn: false },
+                      { key: "block_trackers", label: "blockTrackers", defaultOn: false },
+                      { key: "block_malware", label: "blockMalware", defaultOn: true },
+                      { key: "block_gambling", label: "blockGambling", defaultOn: false },
+                      { key: "block_social", label: "blockSocial", defaultOn: false },
+                      { key: "block_adult", label: "blockAdult", defaultOn: false },
+                    ] as const).map(({ key, label, defaultOn }) => {
+                      const isOn = settings[key] !== undefined ? settings[key] === "true" : defaultOn;
+                      return (
+                        <button key={key} onClick={async () => {
+                          const next = isOn ? "false" : "true";
+                          try {
+                            await invoke("set_setting", { key, value: next });
+                            setSettings((prev) => ({ ...prev, [key]: next }));
+                          } catch { /* ignore */ }
+                        }} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 transition-colors text-left ${isDark ? "bg-neutral-800 hover:bg-neutral-750" : "bg-neutral-100 hover:bg-neutral-200"}`}>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm ${isDark ? "text-neutral-200" : "text-neutral-800"}`}>{t(label)}</p>
+                          </div>
+                          <div className={`w-8 h-4 rounded-full relative transition-colors ${isOn ? "bg-bullet-600" : isDark ? "bg-neutral-700" : "bg-neutral-300"}`}>
+                            <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${isOn ? "translate-x-4" : "translate-x-0.5"}`} />
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                {/* Diagnostics */}
+                <div className={cardCls}>
+                  <h2 className={`text-sm font-medium ${headingCls} mb-3`}>{t("diagnostics")}</h2>
+                  <div className="flex gap-2">
+                    <button onClick={async () => {
+                      try {
+                        const report = await invoke<string>("generate_diagnostic_report");
+                        setDiagnosticReport(report);
+                      } catch (e) { addLog(t("logError", { error: String(e) })); }
+                    }} className="flex-1 px-3 py-1.5 bg-bullet-600 text-white text-xs rounded hover:bg-bullet-700 transition-colors">{t("generateReport")}</button>
+                    {diagnosticReport && (
+                      <button onClick={() => { navigator.clipboard.writeText(diagnosticReport); }} className={`px-3 py-1.5 text-xs rounded transition-colors ${isDark ? "bg-neutral-800 text-neutral-300 hover:bg-neutral-700" : "bg-neutral-200 text-neutral-700 hover:bg-neutral-300"}`}>{t("copyToClipboard")}</button>
+                    )}
+                  </div>
+                  {diagnosticReport && (
+                    <textarea readOnly value={diagnosticReport} className={`mt-2 w-full h-40 rounded px-3 py-2 text-xs font-mono resize-none focus:outline-none ${isDark ? "bg-neutral-800 border border-neutral-700 text-neutral-300" : "bg-neutral-100 border border-neutral-300 text-neutral-700"}`} />
+                  )}
                 </div>
                 {/* Update check */}
                 <div className={cardCls}>

@@ -25,6 +25,8 @@ pub struct SshTunnel {
     pub ssh_user: String,
     #[serde(default)]
     pub ssh_key: String,
+    #[serde(default)]
+    pub profile_id: String,
 }
 
 pub struct TunnelStore {

@@ -16,7 +16,7 @@ pub fn is_active() -> bool {
     marker_path().exists()
 }
 
-pub fn enable(iface: &str, endpoint_ip: &str) -> Result<(), String> {
+pub fn enable(iface: &str, endpoint_ip: &str, allow_lan: bool) -> Result<(), String> {
     let p = permissions::priv_cmd();
 
     let _ = run(p, &["iptables", "-N", CHAIN]);
@@ -29,8 +29,10 @@ pub fn enable(iface: &str, endpoint_ip: &str) -> Result<(), String> {
         &["iptables", "-A", CHAIN, "-d", endpoint_ip, "-j", "ACCEPT"],
     )?;
 
-    for net in &["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"] {
-        run(p, &["iptables", "-A", CHAIN, "-d", net, "-j", "ACCEPT"])?;
+    if allow_lan {
+        for net in &["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"] {
+            run(p, &["iptables", "-A", CHAIN, "-d", net, "-j", "ACCEPT"])?;
+        }
     }
 
     run(

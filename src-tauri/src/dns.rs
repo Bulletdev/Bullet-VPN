@@ -124,6 +124,32 @@ pub fn restore() -> Result<(), String> {
     Ok(())
 }
 
+/// Returns the appropriate AdGuard DNS server address based on active content blockers.
+/// Returns None if no blockers are enabled (use profile DNS instead).
+///
+/// AdGuard DNS addresses:
+///   - Default (ads + trackers): 94.140.14.14
+///   - Family (ads + trackers + adult): 94.140.14.15
+///   - Non-filtering (malware only via default): 94.140.14.14
+pub fn blocker_dns(
+    block_ads: bool,
+    block_trackers: bool,
+    block_malware: bool,
+    block_adult: bool,
+) -> Option<String> {
+    if !block_ads && !block_trackers && !block_malware && !block_adult {
+        return None;
+    }
+
+    // Adult content blocking requires the Family protection server
+    if block_adult {
+        return Some("94.140.14.15".to_string());
+    }
+
+    // Any other combination uses the default AdGuard DNS
+    Some("94.140.14.14".to_string())
+}
+
 pub fn check_leak() -> Result<Vec<String>, String> {
     let content = fs::read_to_string("/etc/resolv.conf").map_err(|e| e.to_string())?;
 

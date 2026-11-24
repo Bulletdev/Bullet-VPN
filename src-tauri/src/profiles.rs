@@ -31,6 +31,20 @@ pub struct Profile {
     pub dns: String,
     #[serde(default)]
     pub ovpn_config_path: String,
+    #[serde(default)]
+    pub multihop: bool,
+    #[serde(default)]
+    pub entry_profile_id: String,
+    #[serde(default)]
+    pub obfuscation: String,
+    #[serde(default)]
+    pub obfuscation_port: u16,
+    #[serde(default)]
+    pub mtu: u16,
+    #[serde(default)]
+    pub preshared_key: String,
+    #[serde(default)]
+    pub daita: bool,
 }
 
 pub struct ProfileStore {
