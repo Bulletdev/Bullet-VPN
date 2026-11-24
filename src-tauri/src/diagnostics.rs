@@ -66,7 +66,11 @@ pub fn ping_host(host: &str) -> Result<u32, String> {
 
     let clean = host.trim();
     let hostname = if clean.starts_with('[') {
-        clean.split(']').next().unwrap_or(clean).trim_start_matches('[')
+        clean
+            .split(']')
+            .next()
+            .unwrap_or(clean)
+            .trim_start_matches('[')
     } else if clean.matches(':').count() == 1 {
         clean.split(':').next().unwrap_or(clean)
     } else {

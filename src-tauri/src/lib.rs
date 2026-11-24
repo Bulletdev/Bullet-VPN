@@ -948,6 +948,13 @@ pub fn run() {
                 .build(app)?;
 
             if let Some(window) = app.get_webview_window("main") {
+                {
+                    let png_bytes = include_bytes!("../icons/icon.png");
+                    if let Ok(icon) = tauri::image::Image::from_bytes(png_bytes) {
+                        let _ = window.set_icon(icon);
+                    }
+                }
+
                 let w = window.clone();
                 window.on_window_event(move |event| {
                     if let tauri::WindowEvent::CloseRequested { api, .. } = event {
