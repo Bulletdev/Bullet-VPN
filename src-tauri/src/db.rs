@@ -29,6 +29,13 @@ impl Database {
         let conn = Connection::open(&path).map_err(|e| format!("sqlite open: {e}"))?;
 
         conn.execute_batch(
+            "PRAGMA journal_mode=WAL;
+             PRAGMA synchronous=NORMAL;
+             PRAGMA busy_timeout=5000;",
+        )
+        .ok();
+
+        conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS encryption_key (
                 id INTEGER PRIMARY KEY,
                 key_data TEXT NOT NULL
@@ -487,6 +494,22 @@ impl Database {
                 params![key, value],
             )
             .map_err(|e| format!("save setting: {e}"))?;
+        Ok(())
+    }
+
+    pub fn set_settings_batch(&self, pairs: &[(&str, &str)]) -> Result<(), String> {
+        let conn = self.conn();
+        let tx = conn
+            .unchecked_transaction()
+            .map_err(|e| format!("begin tx: {e}"))?;
+        for (key, value) in pairs {
+            tx.execute(
+                "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
+                params![key, value],
+            )
+            .map_err(|e| format!("save setting {key}: {e}"))?;
+        }
+        tx.commit().map_err(|e| format!("commit: {e}"))?;
         Ok(())
     }
 

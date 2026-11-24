@@ -640,23 +640,21 @@ function App() {
   ];
 
   const loadSettings = useCallback(async () => {
-    for (const key of SETTING_KEYS) {
-      try {
-        const val = await invoke<string | null>("get_setting", { key });
-        if (val !== null) setSettings((prev) => ({ ...prev, [key]: val }));
-      } catch { /* ignore */ }
-    }
+    try {
+      const map = await invoke<Record<string, string>>("get_all_settings", { keys: SETTING_KEYS });
+      setSettings((prev) => ({ ...prev, ...map }));
+    } catch { /* ignore */ }
   }, []);
 
   const pingProfiles = useCallback(async () => {
-    for (const p of profiles) {
+    await Promise.all(profiles.map(async (p) => {
       try {
         const ms = await invoke<number>("ping_profile_endpoint", { endpoint: p.endpoint });
         setProfileLatency((prev) => ({ ...prev, [p.id]: ms }));
       } catch {
         setProfileLatency((prev) => ({ ...prev, [p.id]: null }));
       }
-    }
+    }));
   }, [profiles]);
 
   const checkStatus = useCallback(async () => {

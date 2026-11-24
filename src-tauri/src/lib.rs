@@ -78,6 +78,20 @@ fn get_setting(state: State<AppState>, key: String) -> Result<Option<String>, St
 }
 
 #[tauri::command]
+fn get_all_settings(
+    state: State<AppState>,
+    keys: Vec<String>,
+) -> Result<std::collections::HashMap<String, String>, String> {
+    let mut map = std::collections::HashMap::new();
+    for key in &keys {
+        if let Some(val) = state.db.get_setting(key) {
+            map.insert(key.clone(), val);
+        }
+    }
+    Ok(map)
+}
+
+#[tauri::command]
 fn set_setting(state: State<AppState>, key: String, value: String) -> Result<(), String> {
     state.db.set_setting(&key, &value)
 }
@@ -475,27 +489,15 @@ fn save_blocker_settings(
     block_social: bool,
     block_adult: bool,
 ) -> Result<(), String> {
-    state
-        .db
-        .set_setting("block_ads", if block_ads { "true" } else { "false" })?;
-    state.db.set_setting(
-        "block_trackers",
-        if block_trackers { "true" } else { "false" },
-    )?;
-    state.db.set_setting(
-        "block_malware",
-        if block_malware { "true" } else { "false" },
-    )?;
-    state.db.set_setting(
-        "block_gambling",
-        if block_gambling { "true" } else { "false" },
-    )?;
-    state
-        .db
-        .set_setting("block_social", if block_social { "true" } else { "false" })?;
-    state
-        .db
-        .set_setting("block_adult", if block_adult { "true" } else { "false" })?;
+    let b = |v: bool| if v { "true" } else { "false" };
+    state.db.set_settings_batch(&[
+        ("block_ads", b(block_ads)),
+        ("block_trackers", b(block_trackers)),
+        ("block_malware", b(block_malware)),
+        ("block_gambling", b(block_gambling)),
+        ("block_social", b(block_social)),
+        ("block_adult", b(block_adult)),
+    ])?;
     Ok(())
 }
 
@@ -1007,6 +1009,7 @@ pub fn run() {
             remove_profile,
             import_ovpn,
             get_setting,
+            get_all_settings,
             set_setting,
             generate_keypair,
             derive_public_key,
